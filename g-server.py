@@ -8,6 +8,8 @@ import uuid
 import secrets
 import string
 import base64
+import hmac
+import hashlib
 from flask import Flask, render_template, jsonify, make_response, send_file, send_from_directory, request
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timedelta
@@ -407,6 +409,7 @@ def decrypt_password(encrypted_password, private_key_pem):
         private_key_pem,
         password=None,
     )
+    print(encrypted_password)
     encrypted_password_bytes = base64.b64decode(encrypted_password)
     decrypted_password = private_key.decrypt(
         encrypted_password_bytes,
@@ -423,6 +426,38 @@ def update_existing_passwords():
             db.session.commit()
 
 
+def validate_geetest(validate):
+    geetest_config = app.config['GEETEST_CONFIG']
+    captcha_id = geetest_config.get('captchaId')
+    captcha_key = geetest_config.get('captchaKey')
+    lot_number = validate.get('lot_number', '')
+    captcha_output = validate.get('captcha_output', '')
+    pass_token = validate.get('pass_token', '')
+    gen_time = validate.get('gen_time', '')
+
+    lotnumber_bytes = lot_number.encode()
+    prikey_bytes = captcha_key.encode()
+    sign_token = hmac.new(prikey_bytes, lotnumber_bytes, digestmod=hashlib.sha256).hexdigest()
+
+    query = {
+        "lot_number": lot_number,
+        "captcha_output": captcha_output,
+        "pass_token": pass_token,
+        "gen_time": gen_time,
+        "sign_token": sign_token,
+    }
+    url = f"http://gcaptcha4.geetest.com/validate?captcha_id={captcha_id}"
+
+    try:
+        res = requests.post(url, data=query)
+        assert res.status_code == 200
+        gt_msg = res.json()
+    except Exception as e:
+        gt_msg = {'result': 'fail', 'reason': 'request geetest api fail'}
+
+    return gt_msg['result'] == 'success'
+
+
 @app.route('/get-public-key', methods=['GET'])
 def get_public_key():
     return public_key_pem, 200
@@ -430,8 +465,13 @@ def get_public_key():
 
 @app.route('/login', methods=['POST'])
 def login():
-    username = request.form.get('username')
-    encrypted_password = request.form.get('password').encode('utf-8')
+    data = request.json
+    username = data.get('username')
+    encrypted_password = data.get('password').encode('utf-8')
+    validate = data.get('validate')
+
+    if not validate_geetest(validate):
+        return "Invalid captcha", 401
 
     password = decrypt_password(encrypted_password, private_key_pem)
 
@@ -534,7 +574,9 @@ def home():
 
 @app.route("/game-events")
 def game_events():
-    return render_template("game-events.html", nowYear=datetime.now().year)
+    geetest_config = app.config['GEETEST_CONFIG']
+    captcha_id = geetest_config.get('captchaId')
+    return render_template("game-events.html", nowYear=datetime.now().year, captchaId=captcha_id)
 
 
 @app.route('/favicon')
@@ -568,12 +610,21 @@ def dynamic_favicon():
     return response
 
 
+def load_geetest_config():
+    geetest_config_path = os.path.join(base_dir, 'geetest.json')
+    with open(geetest_config_path, 'r', encoding='utf-8') as f:
+        geetest_config = json.load(f)
+    return geetest_config
+
+
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
         initialize_user()
         update_existing_passwords()
         scheduler = BackgroundScheduler()
+        geetest_config = load_geetest_config()
+        app.config['GEETEST_CONFIG'] = geetest_config
         scheduler.add_job(scheduled_task, 'cron', hour=9, minute=0)
         scheduler.add_job(scheduled_task, 'cron', hour=11, minute=0)
         scheduler.add_job(scheduled_task, 'cron', hour=18, minute=0)

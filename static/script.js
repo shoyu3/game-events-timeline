@@ -52,8 +52,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!err) {
             usernameinput.classList.remove('red');
             passwordinput.classList.remove('red');
-            logbtn.disabled = true;
-            logbtn.innerHTML = "...";
             login(username, password);
         }
     });
@@ -94,6 +92,16 @@ function loadEvents(socket) {
 }
 
 async function login(username, password) {
+    window.userinfo = { "username": username, "password": password };
+    captchaObj.showCaptcha(); //显示验证码
+}
+
+async function login2(validate) {
+    const logbtn = document.querySelector(".login-btn");
+    logbtn.disabled = true;
+    logbtn.innerHTML = "...";
+    const username = userinfo['username'];
+    const password = userinfo['password'];
     const response = await fetch('/get-public-key');
     const publicKey = await response.text();
     const encryptedPassword = await encryptPassword(password, publicKey);
@@ -101,9 +109,13 @@ async function login(username, password) {
     const loginResponse = await fetch('/login', {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
+            'Content-Type': 'application/json',
         },
-        body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(encryptedPassword)}`,
+        body: JSON.stringify({
+            username: username,
+            password: encryptedPassword,
+            validate: validate
+        }),
     });
 
     if (loginResponse.ok) {
