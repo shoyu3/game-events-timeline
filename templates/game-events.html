@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh-cmn-hans">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>原铁绝潮 - 活动时间线 - G.4G.Si</title>
+    <link rel="icon" type="image/png" href="/favicon">
+    <link rel="shortcut icon" href="/favicon">
+    <link rel="stylesheet" href="static/style.css">
+</head>
+
+<body>
+    <div class="timeline-container">
+        <div class="date-axis"></div>
+        <div class="timeline"></div>
+    </div>
+    <div class="left-corner-container">
+        <center class="login-container label">
+            <div class="login-form hide">
+                <span>账号</span><br><input name="username" type="text" maxlength="16"><br>
+                <span>密码</span><br><input name="password" type="password" maxlength="32"><br><br>
+                <button class="login-btn">确认登录</button>
+            </div>
+        </center>
+        <div class="legend-container">
+            <div class="legend-inner">
+                <div class="legend-list label">Loading...</div>
+                <hr>
+                <div class="label">原铁绝潮 - 活动时间线<br><a href="https://github.com/shoyu3/game-events-timeline" target="_blank">GitHub 项目主页</a><br>&copy; {{ nowYear }} <a
+                        href="https://g.4g.si">G.4G.Si</a>
+                </div>
+            </div>
+            <button class="toggle-btn">▼</button>
+        </div>
+    </div>
+    <div class="banner-img-container" style="display:none;">
+        <img src="" alt="Banner Image" class="banner-img">
+        <div class="event-info">
+            <span class="event-name"></span><br>
+            <span class="event-start-date"></span><br>
+            <span class="event-end-date"></span><br>
+            <span class="event-remaining-time"></span>
+        </div>
+        <button class="close-btn">✕</button>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsencrypt/3.3.2/jsencrypt.min.js"></script>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"
+        integrity="sha384-2huaZvOR9iDzHqslqwpR87isEmrfxqyWOF7hr7BY6KG0+hVKLoEXMPUJw3ynWuhO"
+        crossorigin="anonymous"></script>
+    <script src="static/script.js"></script>
+</body>
+
+</html>
