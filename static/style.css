@@ -78,7 +78,7 @@ input:not([type=submit]):not([type=file]).red {
 .event {
     position: absolute;
     height: 30px;
-    border-radius: 8px;
+    border-radius: 8px 12px 12px 8px;
     color: white;
     display: flex;
     align-items: center;
@@ -93,6 +93,14 @@ input:not([type=submit]):not([type=file]).red {
     position: sticky;
     left: 5px;
     display: flex;
+    z-index: 5;
+}
+
+.event-banner {
+    mask-image: linear-gradient(to left, rgba(0, 0, 0, 1), rgba(0, 0, 0, 0));
+    border-radius: 8px;
+    zoom: 1.5;
+    background-size: 110%;
 }
 
 .current-time-marker {

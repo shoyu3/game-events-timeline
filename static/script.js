@@ -72,6 +72,7 @@ function loadEvents(socket) {
                             color: getColor(type),
                             bannerImage: event.bannerImage,
                             uuid: event.uuid,
+                            type: type,
                         };
                         events.push(newEvent);
                     });
@@ -352,12 +353,26 @@ function createTimeline(events) {
         const oneDayInMs = 1000 * 60 * 60 * 24;
 
         if (timeRemainingInMs <= oneDayInMs + oneDayInMs / 2) {
-            eventElement.style.backgroundImage = `linear-gradient(to right, ${event.color} calc(100% - 180px), red 100%)`;
+            eventElement.style.backgroundImage = `linear-gradient(to right, ${event.color} calc(100% - 252px), red 100%)`;
         } else if (timeRemainingInMs <= 3 * oneDayInMs + oneDayInMs / 2) {
-            eventElement.style.backgroundImage = `linear-gradient(to right, ${event.color} calc(100% - 180px), #FF5000 100%)`;
+            eventElement.style.backgroundImage = `linear-gradient(to right, ${event.color} calc(100% - 252px), #FF5000 100%)`;
         }
 
         eventElement.appendChild(eventTitle);
+
+        // 创建并添加带有 bannerImage 的 div
+        const bannerDiv = document.createElement('div');
+        bannerDiv.classList.add('event-banner');
+        bannerDiv.style.backgroundImage = `url(${event.bannerImage})`;
+        bannerDiv.style.backgroundPosition = 'center';
+        bannerDiv.style.position = 'absolute';
+        bannerDiv.style.right = '0';
+        bannerDiv.style.top = '0';
+        bannerDiv.style.bottom = '0';
+        bannerDiv.style.width = '100px'; // 你可以根据需要调整宽度
+        // console.log(event)
+        eventElement.appendChild(bannerDiv);
+
         timeline.appendChild(eventElement);
         updateCurrentTimeMarker();
 
