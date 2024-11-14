@@ -1,0 +1,9 @@
+requests
+Flask
+flask-cors
+flask-socketio
+flask-sqlalchemy
+Pillow
+apscheduler
+cryptography
+Werkzeug

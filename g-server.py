@@ -134,6 +134,7 @@ class Event(db.Model):
     start_time = db.Column(db.DateTime)
     end_time = db.Column(db.DateTime)
     banner_image = db.Column(db.String(16384))
+    event_type = db.Column(db.String(50))
 
     def __init__(self, **kwargs):
         super(Event, self).__init__(**kwargs)
@@ -231,23 +232,66 @@ def title_filter(game, title):
     return False
 
 
+def extract_sr_character_names(html_content):
+    # logging.info(html_content)
+    pattern = r"限定5星角色「([^」]+)」"
+    matches = re.findall(pattern, html_content)
+    if matches:
+        return [name.split('（')[0] for name in matches]
+    else:
+        return ["角色"]
+
+
+def extract_sr_weapon_names(html_content):
+    pattern = r"限定5星光锥「([^」]+)」"
+    matches = re.findall(pattern, html_content)
+    if matches:
+        return [name.split('（')[0] for name in matches]
+    else:
+        return ["角色"]
+
+
+def extract_zzz_character_names(html_content):
+    pattern = r"活动期间，限定S级代理人.*?\[(.*?)\(.*?\)\].*?以及A级代理人"
+    matches = re.findall(pattern, html_content)
+    if matches:
+        return matches
+    else:
+        return ["代理人"]
+
+
+def extract_zzz_weapon_names(html_content):
+    pattern = r"活动期间，限定S级音擎.*?\[(.*?)\(.*?\)\].*?以及A级音擎"
+    matches = re.findall(pattern, html_content)
+    if matches:
+        return matches
+    else:
+        return ["音擎"]
+
+
 def fetch_and_save_announcements():
     session = requests.Session()
-    urls = {
+    ann_list_urls = {
         "ys": "https://hk4e-ann-api.mihoyo.com/common/hk4e_cn/announcement/api/getAnnList?game=hk4e&game_biz=hk4e_cn&lang=zh-cn&bundle_id=hk4e_cn&level=1&platform=pc&region=cn_gf01&uid=1",
         "sr": "https://hkrpg-ann-api.mihoyo.com/common/hkrpg_cn/announcement/api/getAnnList?game=hkrpg&game_biz=hkrpg_cn&lang=zh-cn&bundle_id=hkrpg_cn&level=1&platform=pc&region=prod_gf_cn&uid=1",
         "zzz": "https://announcement-api.mihoyo.com/common/nap_cn/announcement/api/getAnnList?game=nap&game_biz=nap_cn&lang=zh-cn&bundle_id=nap_cn&level=1&platform=pc&region=prod_gf_cn&uid=1",
         "ww": "https://aki-gm-resources-back.aki-game.com/gamenotice/G152/76402e5b20be2c39f095a152090afddc/notice.json",
     }
-
-    for key, url in urls.items():
+    ann_content_urls = {
+        "ys": "https://hk4e-ann-api.mihoyo.com/common/hk4e_cn/announcement/api/getAnnContent?game=hk4e&game_biz=hk4e_cn&lang=zh-cn&bundle_id=hk4e_cn&level=1&platform=pc&region=cn_gf01&uid=1",
+        "sr": "https://hkrpg-ann-api.mihoyo.com/common/hkrpg_cn/announcement/api/getAnnContent?game=hkrpg&game_biz=hkrpg_cn&lang=zh-cn&bundle_id=hkrpg_cn&level=1&platform=pc&region=prod_gf_cn&uid=1",
+        "zzz": "https://announcement-api.mihoyo.com/common/nap_cn/announcement/api/getAnnContent?game=nap&game_biz=nap_cn&lang=zh-cn&bundle_id=nap_cn&level=1&platform=pc&region=prod_gf_cn&uid=1",
+        "ww": "",
+    }
+    for key, url in ann_list_urls.items():
         try:
-            response = session.get(url, timeout=(5, 10))
+            response = session.get(url, timeout=(5, 20))
             response.raise_for_status()
             filtered_list = []
             data = response.json()
 
             if key == "ys":
+                gacha_events = {}
                 for item in data["data"]["list"]:
                     if item["type_label"] == "活动公告":
                         for announcement in item["list"]:
@@ -255,16 +299,44 @@ def fetch_and_save_announcements():
                             if "时限内" in clean_title or (announcement["tag_label"] == "活动" and title_filter(key, clean_title)):
                                 announcement["title"] = clean_title
                                 announcement["bannerImage"] = announcement.get("banner", "")
+                                announcement["event_type"] = "event"
                                 filtered_list.append(announcement)
+                            elif announcement["tag_label"] == "扭蛋":
+                                gacha_events[announcement['ann_id']] = announcement
                     elif item["type_label"] == "游戏公告":
                         for announcement in item["list"]:
                             clean_title = remove_html_tags(announcement["title"])
                             if "版本更新说明" in clean_title:
                                 announcement["title"] = "原神 " + str(extract_floats(clean_title)[0]) + " 版本"
                                 announcement["bannerImage"] = announcement.get("banner", "")
+                                announcement["event_type"] = "version"
                                 filtered_list.append(announcement)
 
+                ann_content_response = session.get(ann_content_urls[key], timeout=(5, 20))
+                ann_content_response.raise_for_status()
+                ann_content_data = ann_content_response.json()
+                for announcement in ann_content_data['data']['list']:
+                    clean_title = remove_html_tags(announcement["title"])
+                    if '祈愿' in clean_title:
+                        if '神铸赋形' in clean_title:
+                            pattern = r'「[^」]*·([^」]*)」'
+                            weapon_names = re.findall(pattern, clean_title)
+                            clean_title = f"【神铸赋形】祈愿: {", ".join(weapon_names)}"
+                        else:
+                            match = re.search(r'·(.*)\(', clean_title)
+                            character_name = match.group(1)
+                            # logging.info("\n"*3 + match.group(1) + "\n"*3)
+                            match = re.search(r'「([^」]+)」祈愿', clean_title)
+                            gacha_name = match.group(1)
+                            clean_title = f"【{gacha_name}】祈愿: {character_name}"
+                        announcement = gacha_events[announcement['ann_id']]
+                        announcement["title"] = clean_title
+                        announcement["bannerImage"] = announcement.get("banner", "")
+                        announcement["event_type"] = "gacha"
+                        filtered_list.append(announcement)
+
             elif key == "sr":
+                gacha_events = {}
                 for item in data["data"]["list"]:
                     if item["type_label"] == "公告":
                         for announcement in item["list"]:
@@ -272,10 +344,12 @@ def fetch_and_save_announcements():
                             if title_filter(key, clean_title):
                                 announcement["title"] = clean_title
                                 announcement["bannerImage"] = announcement.get("banner", "")
+                                announcement["event_type"] = "event"
                                 filtered_list.append(announcement)
                             elif "版本更新说明" in clean_title:
                                 announcement["title"] = "崩坏：星穹铁道 " + str(extract_floats(clean_title)[0]) + " 版本"
                                 announcement["bannerImage"] = announcement.get("banner", "")
+                                announcement["event_type"] = "version"
                                 filtered_list.append(announcement)
 
                 for item in data["data"]["pic_list"]:
@@ -285,9 +359,39 @@ def fetch_and_save_announcements():
                             if title_filter(key, clean_title):
                                 announcement["title"] = clean_title
                                 announcement["bannerImage"] = announcement.get("img", "")
+                                announcement["event_type"] = "event"
                                 filtered_list.append(announcement)
+                            elif "跃迁" in clean_title:
+                                gacha_events[announcement['ann_id']] = announcement
+
+                ann_content_response = session.get(ann_content_urls[key], timeout=(5, 20))
+                ann_content_response.raise_for_status()
+                ann_content_data = ann_content_response.json()
+                # logging.info(str(ann_content_data['data']['pic_list']))
+                for announcement in ann_content_data['data']['pic_list']:
+                    # logging.info(str(announcement))
+                    clean_title = remove_html_tags(announcement["title"])
+                    if '跃迁' in clean_title:
+                        if '光锥' in clean_title:
+                            match = re.search(r'「([^」]+)」', clean_title)
+                            # [「]([^「」]+)[」]
+                            weapon_gacha_name = match.group(1)
+                            weapon_names = extract_sr_weapon_names(announcement['content'])
+                            clean_title = f"【{weapon_gacha_name}】跃迁: {", ".join(weapon_names)}"
+                        else:
+                            character_names = extract_sr_character_names(announcement['content'])
+                            gacha_names = re.findall(r'「([^」]+)」', clean_title)
+                            clean_title = f"【{", ".join(gacha_names)}】跃迁: {", ".join(character_names)}"
+                        # logging.info(f"\n\n\n {key} {announcement} \n\n\n")
+                        announcement = gacha_events[announcement['ann_id']]
+                        announcement["title"] = clean_title
+                        announcement["bannerImage"] = announcement.get("img", "")
+                        announcement["event_type"] = "gacha"
+                        filtered_list.append(announcement)
+                # logging.info("\n"*3 + str(filtered_list) + "\n"*3)
 
             elif key == "zzz":
+                gacha_events = {}
                 for item in data["data"]["list"]:
                     if item["type_id"] == 4:
                         for announcement in item["list"]:
@@ -295,14 +399,41 @@ def fetch_and_save_announcements():
                             if title_filter(key, clean_title):
                                 announcement["title"] = clean_title
                                 announcement["bannerImage"] = announcement.get("banner", "")
+                                announcement["event_type"] = "event"
                                 filtered_list.append(announcement)
+                            elif "调频" in clean_title:
+                                gacha_events[announcement['ann_id']] = announcement
                     elif item["type_label"] == "游戏公告":
                         for announcement in item["list"]:
                             clean_title = remove_html_tags(announcement["title"])
                             if "更新说明" in clean_title:
                                 announcement["title"] = "绝区零 " + str(extract_floats(clean_title)[0]) + " 版本"
                                 announcement["bannerImage"] = announcement.get("banner", "")
+                                announcement["event_type"] = "version"
                                 filtered_list.append(announcement)
+                ann_content_response = session.get(ann_content_urls[key], timeout=(5, 20))
+                ann_content_response.raise_for_status()
+                ann_content_data = ann_content_response.json()
+                # logging.info("\n"*3 + key + str(ann_content_data) + "\n"*3)
+                # logging.info("\n"*3 + str(ann_content_data['data']['list'][0]['list']) + "\n"*3)
+                for announcement in ann_content_data['data']['list']:
+                    # logging.info("\n"*3 + str(announcement) + "\n"*3)
+                    clean_title = remove_html_tags(announcement["title"])
+                    if '调频' in clean_title:
+                        if '喧哗奏鸣' in clean_title:
+                            weapon_names = extract_zzz_weapon_names(announcement['content'])
+                            clean_title = f"【喧哗奏鸣】调频: {", ".join(weapon_names)}"
+                        else:
+                            character_names = extract_zzz_character_names(announcement['content'])
+                            gacha_names = re.findall(r'「([^」]+)」', clean_title)
+                            clean_title = f"【{", ".join(gacha_names)}】调频: {", ".join(character_names)}"
+                        # logging.info(f"\n\n\n {key} {announcement} \n\n\n")
+                        announcement = gacha_events[announcement['ann_id']]
+                        announcement["title"] = clean_title
+                        announcement["bannerImage"] = announcement.get("banner", "")
+                        announcement["event_type"] = "gacha"
+                        filtered_list.append(announcement)
+                # logging.info("\n"*3 + "!!!" + str(filtered_list) + "\n"*3)
 
             elif key == "ww":
                 for announcement in data["game"]:
@@ -312,6 +443,7 @@ def fetch_and_save_announcements():
                         announcement["bannerImage"] = announcement.get("tabBanner", {}).get("zh-Hans", "")[0]
                         announcement["start_time"] = datetime.fromtimestamp(announcement["startTimeMs"] / 1000).strftime('%Y-%m-%d %H:%M:%S')
                         announcement["end_time"] = datetime.fromtimestamp(announcement["endTimeMs"] / 1000).strftime('%Y-%m-%d %H:%M:%S')
+                        announcement["event_type"] = "version"
                         filtered_list.append(announcement)
                 for announcement in data["activity"]:
                     clean_title = remove_html_tags(announcement["tabTitle"]["zh-Hans"])
@@ -320,6 +452,17 @@ def fetch_and_save_announcements():
                         announcement["bannerImage"] = announcement.get("tabBanner", {}).get("zh-Hans", "")[0]
                         announcement["start_time"] = datetime.fromtimestamp(announcement["startTimeMs"] / 1000).strftime('%Y-%m-%d %H:%M:%S')
                         announcement["end_time"] = datetime.fromtimestamp(announcement["endTimeMs"] / 1000).strftime('%Y-%m-%d %H:%M:%S')
+                        announcement["event_type"] = "event"
+                        filtered_list.append(announcement)
+                    elif "唤取" in clean_title:
+                        ann_content_response = session.get(announcement['contentPrefix'][0] + "zh-Hans.json", timeout=(5, 20))
+                        ann_content_response.raise_for_status()
+                        ann_content_data = ann_content_response.json()
+                        announcement["title"] = f"【{ann_content_data["textTitle"].split('[')[1].split(']')[0]}】唤取: {ann_content_data["textTitle"].split('「')[1].split('」')[0]}"
+                        announcement["bannerImage"] = announcement.get("tabBanner", {}).get("zh-Hans", "")[0]
+                        announcement["start_time"] = datetime.fromtimestamp(announcement["startTimeMs"] / 1000).strftime('%Y-%m-%d %H:%M:%S')
+                        announcement["end_time"] = datetime.fromtimestamp(announcement["endTimeMs"] / 1000).strftime('%Y-%m-%d %H:%M:%S')
+                        announcement["event_type"] = "gacha"
                         filtered_list.append(announcement)
 
         except requests.exceptions.RequestException as e:
@@ -328,6 +471,7 @@ def fetch_and_save_announcements():
         try:
             for announcement in filtered_list:
                 title = announcement["title"]
+                # logging.info("\n"*3 + "!!!" + str(title) + "\n"*3)
                 if title:
                     existing_event = Event.query.filter_by(title=title).first()
                     if not existing_event:
@@ -338,7 +482,8 @@ def fetch_and_save_announcements():
                                 data=json.dumps(announcement),
                                 start_time=datetime.strptime(announcement.get("start_time", ""), '%Y-%m-%d %H:%M:%S'),
                                 end_time=datetime.strptime(announcement.get("end_time", ""), '%Y-%m-%d %H:%M:%S'),
-                                banner_image=announcement.get("bannerImage", "")
+                                banner_image=announcement.get("bannerImage", ""),
+                                event_type=announcement.get("event_type", ""),
                             )
                             db.session.add(new_event)
                             db.session.commit()
@@ -378,19 +523,26 @@ def get_notice():
     for event in active_events:
         if event.game not in results:
             results[event.game] = []
-        if title_filter(event.game, event.title):
+        if event.event_type == "gacha" or title_filter(event.game, event.title):
             results[event.game].append({
                 "title": event.title,
                 "start_time": event.start_time.strftime('%Y-%m-%d %H:%M:%S'),
                 "end_time": event.end_time.strftime('%Y-%m-%d %H:%M:%S'),
                 "bannerImage": event.banner_image,
-                "uuid": event.uuid
+                "uuid": event.uuid,
+                "event_type": event.event_type,
             })
+    # logging.info(str(results['sr']))
 
     for game, events in results.items():
         version_events = [event for event in events if "版本" in event["title"]]
         other_events = [event for event in events if "版本" not in event["title"]]
         results[game] = version_events + other_events
+
+    for game, events in results.items():
+        other_events = [event for event in events if event["event_type"] != "gacha"]
+        gacha_events = [event for event in events if event["event_type"] == "gacha"]
+        results[game] = other_events + gacha_events
 
     response = make_response(json.dumps(results, ensure_ascii=False))
     response.headers['Content-Type'] = 'application/json; charset=utf-8'

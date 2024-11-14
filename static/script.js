@@ -72,7 +72,8 @@ function loadEvents(socket) {
                             color: getColor(type),
                             bannerImage: event.bannerImage,
                             uuid: event.uuid,
-                            type: type,
+                            game: type,
+                            type: event.event_type,
                         };
                         events.push(newEvent);
                     });
@@ -364,7 +365,19 @@ function createTimeline(events) {
         const bannerDiv = document.createElement('div');
         bannerDiv.classList.add('event-banner');
         bannerDiv.style.backgroundImage = `url(${event.bannerImage})`;
-        bannerDiv.style.backgroundPosition = 'center';
+        if (event.type === "gacha") {
+            if (event.game === "ys") {
+                bannerDiv.style.backgroundPosition = 'center 45px';
+            } else if (event.game === "sr") {
+                bannerDiv.style.backgroundPosition = 'center 25px';
+            } else if (event.game === "zzz") {
+                bannerDiv.style.backgroundPosition = 'center 34px';
+            } else {
+                bannerDiv.style.backgroundPosition = 'center';
+            }
+        } else {
+            bannerDiv.style.backgroundPosition = 'center';
+        }
         bannerDiv.style.position = 'absolute';
         bannerDiv.style.right = '0';
         bannerDiv.style.top = '0';
@@ -461,7 +474,12 @@ function showBannerWithInfo(event) {
     }
 
     bannerImage.src = event.bannerImage;
-    eventNameElem.textContent = `${event.name}`;
+    if (event.name.includes("】") && event.name.includes(":")) {
+        let name = event.name.split(":");
+        eventNameElem.innerHTML = `${name[0]}<br>${name[1]}`;
+    } else {
+        eventNameElem.textContent = `${event.name}`;
+    }
     eventStartDateElem.textContent = `📣 ${formatDateTime(event.start)}`;
     eventEndDateElem.textContent = `🛑 ${formatDateTime(event.end)}`;
 

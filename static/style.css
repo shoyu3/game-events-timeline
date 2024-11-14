@@ -98,7 +98,7 @@ input:not([type=submit]):not([type=file]).red {
 
 .event-banner {
     mask-image: linear-gradient(to left, rgba(0, 0, 0, 1), rgba(0, 0, 0, 0));
-    border-radius: 8px;
+    border-radius: 6px;
     zoom: 1.5;
     background-size: 110%;
 }
