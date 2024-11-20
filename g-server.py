@@ -20,6 +20,7 @@ from cryptography.hazmat.primitives import serialization, hashes
 from flask_socketio import SocketIO, emit
 from flask_socketio import join_room, leave_room
 from werkzeug.security import generate_password_hash, check_password_hash
+from bs4 import BeautifulSoup
 
 user_connections = {}
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -233,7 +234,6 @@ def title_filter(game, title):
 
 
 def extract_sr_character_names(html_content):
-    # logging.info(html_content)
     pattern = r"限定5星角色「([^」]+)」"
     matches = re.findall(pattern, html_content)
     if matches:
@@ -269,6 +269,129 @@ def extract_zzz_weapon_names(html_content):
         return ["音擎"]
 
 
+def extract_clean_time(html_time_str):
+    soup = BeautifulSoup(html_time_str, 'html.parser')
+    clean_time_str = soup.get_text().strip()
+    return clean_time_str
+
+
+def extract_ys_event_start_time(html_content):
+    soup = BeautifulSoup(html_content, 'html.parser')
+
+    reward_time_title = soup.find(text="〓获取奖励时限〓") or soup.find(text="〓活动时间〓")
+
+    if reward_time_title:
+        reward_time_paragraph = reward_time_title.find_next('p')
+        if reward_time_paragraph:
+            time_range = reward_time_paragraph.get_text()
+            if "~" in time_range:
+                return time_range.split("~")[0].strip()
+            return time_range
+    return ""
+
+
+def extract_ys_gacha_start_time(html_content):
+    soup = BeautifulSoup(html_content, 'html.parser')
+    td_element = soup.find('td', {'rowspan': '3'})
+    if td_element == None:
+        td_element = soup.find('td', {'rowspan': '5'})
+        if td_element == None:
+            raise Exception(str(html_content))
+    time_texts = []
+    for child in td_element.children:
+        if child.name == 'p':
+            span = child.find('span')
+            if span:
+                time_texts.append(span.get_text())
+        elif child.name == 't':
+            span = child.find('span')
+            if span:
+                time_texts.append(span.get_text())
+    time_range = ' '.join(time_texts)
+    if "~" in time_range:
+        return time_range.split("~")[0].strip()
+    return time_range
+
+
+def extract_sr_event_start_time(html_content):
+    pattern = r"<h1[^>]*>(?:活动时间|限时活动期)</h1>\s*<p[^>]*>(.*?)</p>"
+    match = re.search(pattern, html_content, re.DOTALL)
+
+    if match:
+        time_info = match.group(1)
+        cleaned_time_info = re.sub("&lt;.*?&gt;", "", time_info)
+        if "-" in cleaned_time_info:
+            return cleaned_time_info.split("-")[0].strip()
+        return cleaned_time_info
+    else:
+        return ""
+
+
+def extract_sr_gacha_start_time(html_content):
+    pattern = r"时间为(.*?)，包含如下内容"
+    matches = re.findall(pattern, html_content)
+    time_range = re.sub("&lt;.*?&gt;", "", matches[0].strip())
+    if "-" in time_range:
+        return time_range.split("-")[0].strip()
+    return time_range
+
+
+def extract_zzz_event_start_time(html_content):
+    soup = BeautifulSoup(html_content, 'html.parser')
+    activity_time_label = soup.find('p', string=lambda text: text and '【活动时间】' in text)
+    if activity_time_label:
+        activity_time_p = activity_time_label.find_next('p')
+        if activity_time_p:
+            activity_time_text = activity_time_p.get_text(strip=True)
+            if "~" in activity_time_text:
+                return activity_time_text.split("~")[0].replace("（服务器时间）", "").strip()
+            return activity_time_text
+    return ""
+
+
+def extract_ww_event_start_time(html_content):
+    soup = BeautifulSoup(html_content, 'html.parser')
+    activity_time_header = soup.find('div', string=lambda text: text and '✦活动时间✦' in text)
+    if activity_time_header:
+        activity_time_div = activity_time_header.find_next_sibling('div')
+        if activity_time_div:
+            activity_time = activity_time_div.get_text(strip=True)
+            if "~" in activity_time:
+                return activity_time.split("~")[0].replace("（服务器时间）", "").strip()
+            return activity_time
+    return ""
+
+
+def extract_zzz_gacha_start_time(html_content):
+    soup = BeautifulSoup(html_content, 'html.parser')
+    table = soup.find('table')
+    if table == None:
+        raise Exception(html_content)
+    tbody = table.find('tbody')
+    rows = tbody.find_all('tr')
+    activity_time_row = rows[1]
+    activity_time_cell = activity_time_row.find('td', {'rowspan': '2'})
+    activity_time_texts = [p.get_text() for p in activity_time_cell.find_all('p')]
+    activity_time = ' '.join(activity_time_texts).strip()
+    return activity_time_texts[0].strip()
+
+
+def update_event_fields(db_event, new_event_data):
+    fields_to_update = ['game', 'data', 'start_time', 'end_time', 'banner_image', 'event_type']
+    for field in fields_to_update:
+        new_value = getattr(new_event_data, field)
+        if field == 'data':
+            db_value = json.loads(db_event.data)
+            new_value_json = json.loads(new_value)
+            if db_value != new_value_json:
+                db_event.data = json.dumps(new_value_json)
+        else:
+            db_value = getattr(db_event, field)
+            if db_value != new_value:
+                setattr(db_event, field, new_value)
+    db.session.commit()
+
+
 def fetch_and_save_announcements():
     session = requests.Session()
     ann_list_urls = {
@@ -285,184 +408,268 @@ def fetch_and_save_announcements():
     }
     for key, url in ann_list_urls.items():
         try:
+            version_now = "1.0"
+            version_begin_time = "2024-11-01 00:00:01"
             response = session.get(url, timeout=(5, 20))
             response.raise_for_status()
             filtered_list = []
             data = response.json()
 
+            if key != "ww":
+                ann_content_response = session.get(ann_content_urls[key], timeout=(5, 20))
+                ann_content_response.raise_for_status()
+                ann_content_data = ann_content_response.json()
+                content_map = {item['ann_id']: item for item in ann_content_data['data']['list']}
+                content_map.update({item['ann_id']: item for item in ann_content_data['data']['pic_list']})
+
             if key == "ys":
-                gacha_events = {}
+                for item in data["data"]["list"]:
+                    if item["type_label"] == "游戏公告":
+                        for announcement in item["list"]:
+                            clean_title = remove_html_tags(announcement["title"])
+                            if "版本更新说明" in clean_title:
+                                version_now = str(extract_floats(clean_title)[0])
+                                announcement["title"] = "原神 " + version_now + " 版本"
+                                announcement["bannerImage"] = announcement.get("banner", "")
+                                announcement["event_type"] = "version"
+                                version_begin_time = announcement["start_time"]
+                                filtered_list.append(announcement)
+                                break
+
                 for item in data["data"]["list"]:
                     if item["type_label"] == "活动公告":
                         for announcement in item["list"]:
+                            ann_content = content_map[announcement['ann_id']]
                             clean_title = remove_html_tags(announcement["title"])
                             if "时限内" in clean_title or (announcement["tag_label"] == "活动" and title_filter(key, clean_title)):
                                 announcement["title"] = clean_title
                                 announcement["bannerImage"] = announcement.get("banner", "")
                                 announcement["event_type"] = "event"
+                                ann_content_start_time = extract_ys_event_start_time(ann_content['content'])
+                                if f"{version_now}版本" in ann_content_start_time:
+                                    announcement["start_time"] = version_begin_time
+                                else:
+                                    try:
+                                        date_obj = datetime.strptime(extract_clean_time(ann_content_start_time), "%Y/%m/%d %H:%M").replace(second=0)
+                                        formatted_date = date_obj.strftime("%Y-%m-%d %H:%M:%S")
+                                        announcement["start_time"] = formatted_date
+                                    except Exception as e:
+                                        pass
                                 filtered_list.append(announcement)
                             elif announcement["tag_label"] == "扭蛋":
-                                gacha_events[announcement['ann_id']] = announcement
-                    elif item["type_label"] == "游戏公告":
-                        for announcement in item["list"]:
-                            clean_title = remove_html_tags(announcement["title"])
-                            if "版本更新说明" in clean_title:
-                                announcement["title"] = "原神 " + str(extract_floats(clean_title)[0]) + " 版本"
-                                announcement["bannerImage"] = announcement.get("banner", "")
-                                announcement["event_type"] = "version"
-                                filtered_list.append(announcement)
-
-                ann_content_response = session.get(ann_content_urls[key], timeout=(5, 20))
-                ann_content_response.raise_for_status()
-                ann_content_data = ann_content_response.json()
-                for announcement in ann_content_data['data']['list']:
-                    clean_title = remove_html_tags(announcement["title"])
-                    if '祈愿' in clean_title:
-                        if '神铸赋形' in clean_title:
-                            pattern = r'「[^」]*·([^」]*)」'
-                            weapon_names = re.findall(pattern, clean_title)
-                            clean_title = f"【神铸赋形】祈愿: {", ".join(weapon_names)}"
-                        else:
-                            match = re.search(r'·(.*)\(', clean_title)
-                            character_name = match.group(1)
-                            # logging.info("\n"*3 + match.group(1) + "\n"*3)
-                            match = re.search(r'「([^」]+)」祈愿', clean_title)
-                            gacha_name = match.group(1)
-                            clean_title = f"【{gacha_name}】祈愿: {character_name}"
-                        announcement = gacha_events[announcement['ann_id']]
-                        announcement["title"] = clean_title
-                        announcement["bannerImage"] = announcement.get("banner", "")
-                        announcement["event_type"] = "gacha"
-                        filtered_list.append(announcement)
+                                clean_title = ann_content['title']
+                                if '祈愿' in clean_title:
+                                    if '神铸赋形' in clean_title:
+                                        pattern = r'「[^」]*·([^」]*)」'
+                                        weapon_names = re.findall(pattern, clean_title)
+                                        clean_title = f"【神铸赋形】祈愿: {", ".join(weapon_names)}"
+                                    else:
+                                        match = re.search(r'·(.*)\(', clean_title)
+                                        character_name = match.group(1)
+                                        match = re.search(r'「([^」]+)」祈愿', clean_title)
+                                        gacha_name = match.group(1)
+                                        clean_title = f"【{gacha_name}】祈愿: {character_name}"
+                                    ann_content_start_time = extract_ys_gacha_start_time(ann_content['content'])
+                                    if f"{version_now}版本" in ann_content_start_time:
+                                        announcement["start_time"] = version_begin_time
+                                    else:
+                                        try:
+                                            date_obj = datetime.strptime(extract_clean_time(ann_content_start_time), "%Y/%m/%d %H:%M").replace(second=0)
+                                            formatted_date = date_obj.strftime("%Y-%m-%d %H:%M:%S")
+                                            announcement["start_time"] = formatted_date
+                                        except Exception as e:
+                                            pass
+                                    announcement["title"] = clean_title
+                                    announcement["bannerImage"] = ann_content.get("banner", "")
+                                    announcement["event_type"] = "gacha"
+                                    filtered_list.append(announcement)
 
             elif key == "sr":
-                gacha_events = {}
                 for item in data["data"]["list"]:
                     if item["type_label"] == "公告":
                         for announcement in item["list"]:
+                            clean_title = remove_html_tags(announcement["title"])
+                            if "版本更新说明" in clean_title:
+                                version_now = str(extract_floats(clean_title)[0])
+                                announcement["title"] = "崩坏：星穹铁道 " + version_now + " 版本"
+                                announcement["bannerImage"] = announcement.get("banner", "")
+                                announcement["event_type"] = "version"
+                                version_begin_time = announcement["start_time"]
+                                filtered_list.append(announcement)
+
+                for item in data["data"]["list"]:
+                    if item["type_label"] == "公告":
+                        for announcement in item["list"]:
+                            ann_content = content_map[announcement['ann_id']]
                             clean_title = remove_html_tags(announcement["title"])
                             if title_filter(key, clean_title):
                                 announcement["title"] = clean_title
                                 announcement["bannerImage"] = announcement.get("banner", "")
                                 announcement["event_type"] = "event"
-                                filtered_list.append(announcement)
-                            elif "版本更新说明" in clean_title:
-                                announcement["title"] = "崩坏：星穹铁道 " + str(extract_floats(clean_title)[0]) + " 版本"
-                                announcement["bannerImage"] = announcement.get("banner", "")
-                                announcement["event_type"] = "version"
+                                ann_content_start_time = extract_sr_event_start_time(ann_content['content'])
+                                if f"{version_now}版本" in ann_content_start_time:
+                                    announcement["start_time"] = version_begin_time
+                                else:
+                                    try:
+                                        date_obj = datetime.strptime(extract_clean_time(ann_content_start_time), "%Y/%m/%d %H:%M").replace(second=0)
+                                        formatted_date = date_obj.strftime("%Y-%m-%d %H:%M:%S")
+                                        announcement["start_time"] = formatted_date
+                                    except Exception as e:
+                                        pass
                                 filtered_list.append(announcement)
 
                 for item in data["data"]["pic_list"]:
                     for type_item in item["type_list"]:
                         for announcement in type_item["list"]:
+                            ann_content = content_map[announcement['ann_id']]
                             clean_title = remove_html_tags(announcement["title"])
                             if title_filter(key, clean_title):
                                 announcement["title"] = clean_title
                                 announcement["bannerImage"] = announcement.get("img", "")
                                 announcement["event_type"] = "event"
+                                ann_content_start_time = extract_sr_event_start_time(ann_content['content'])
+                                if f"{version_now}版本" in ann_content_start_time:
+                                    announcement["start_time"] = version_begin_time
+                                else:
+                                    try:
+                                        date_obj = datetime.strptime(extract_clean_time(ann_content_start_time), "%Y/%m/%d %H:%M:%S").replace(second=0)
+                                        formatted_date = date_obj.strftime("%Y-%m-%d %H:%M:%S")
+                                        announcement["start_time"] = formatted_date
+                                    except Exception as e:
+                                        pass
                                 filtered_list.append(announcement)
                             elif "跃迁" in clean_title:
-                                gacha_events[announcement['ann_id']] = announcement
-
-                ann_content_response = session.get(ann_content_urls[key], timeout=(5, 20))
-                ann_content_response.raise_for_status()
-                ann_content_data = ann_content_response.json()
-                # logging.info(str(ann_content_data['data']['pic_list']))
-                for announcement in ann_content_data['data']['pic_list']:
-                    # logging.info(str(announcement))
-                    clean_title = remove_html_tags(announcement["title"])
-                    if '跃迁' in clean_title:
-                        if '光锥' in clean_title:
-                            match = re.search(r'「([^」]+)」', clean_title)
-                            # [「]([^「」]+)[」]
-                            weapon_gacha_name = match.group(1)
-                            weapon_names = extract_sr_weapon_names(announcement['content'])
-                            clean_title = f"【{weapon_gacha_name}】跃迁: {", ".join(weapon_names)}"
-                        else:
-                            character_names = extract_sr_character_names(announcement['content'])
-                            gacha_names = re.findall(r'「([^」]+)」', clean_title)
-                            clean_title = f"【{", ".join(gacha_names)}】跃迁: {", ".join(character_names)}"
-                        # logging.info(f"\n\n\n {key} {announcement} \n\n\n")
-                        announcement = gacha_events[announcement['ann_id']]
-                        announcement["title"] = clean_title
-                        announcement["bannerImage"] = announcement.get("img", "")
-                        announcement["event_type"] = "gacha"
-                        filtered_list.append(announcement)
-                # logging.info("\n"*3 + str(filtered_list) + "\n"*3)
+                                if '光锥' in clean_title:
+                                    match = re.search(r'「([^」]+)」', clean_title)
+                                    weapon_gacha_name = match.group(1)
+                                    weapon_names = extract_sr_weapon_names(ann_content['content'])
+                                    clean_title = f"【{weapon_gacha_name}】跃迁: {", ".join(weapon_names)}"
+                                else:
+                                    character_names = extract_sr_character_names(ann_content['content'])
+                                    gacha_names = re.findall(r'「([^」]+)」', clean_title)
+                                    clean_title = f"【{", ".join(gacha_names)}】跃迁: {", ".join(character_names)}"
+                                announcement["title"] = clean_title
+                                announcement["bannerImage"] = announcement.get("img", "")
+                                announcement["event_type"] = "gacha"
+                                ann_content_start_time = extract_sr_gacha_start_time(ann_content['content'])
+                                if f"{version_now}版本" in ann_content_start_time:
+                                    announcement["start_time"] = version_begin_time
+                                else:
+                                    try:
+                                        date_obj = datetime.strptime(extract_clean_time(ann_content_start_time), "%Y/%m/%d %H:%M:%S").replace(second=0)
+                                        formatted_date = date_obj.strftime("%Y-%m-%d %H:%M:%S")
+                                        announcement["start_time"] = formatted_date
+                                    except Exception as e:
+                                        pass
+                                filtered_list.append(announcement)
 
             elif key == "zzz":
-                gacha_events = {}
+                for item in data["data"]["list"]:
+                    if item["type_label"] == "游戏公告":
+                        for announcement in item["list"]:
+                            clean_title = remove_html_tags(announcement["title"])
+                            if "更新说明" in clean_title:
+                                version_now = str(extract_floats(clean_title)[0])
+                                announcement["title"] = "绝区零 " + version_now + " 版本"
+                                announcement["bannerImage"] = announcement.get("banner", "")
+                                announcement["event_type"] = "version"
+                                version_begin_time = announcement["start_time"]
+                                filtered_list.append(announcement)
+
                 for item in data["data"]["list"]:
                     if item["type_id"] == 4:
                         for announcement in item["list"]:
+                            ann_content = content_map[announcement['ann_id']]
                             clean_title = remove_html_tags(announcement["title"])
                             if title_filter(key, clean_title):
                                 announcement["title"] = clean_title
                                 announcement["bannerImage"] = announcement.get("banner", "")
                                 announcement["event_type"] = "event"
+                                ann_content_start_time = extract_zzz_event_start_time(ann_content['content'])
+                                if f"{version_now}版本" in ann_content_start_time:
+                                    announcement["start_time"] = version_begin_time
+                                else:
+                                    try:
+                                        date_obj = datetime.strptime(extract_clean_time(ann_content_start_time), "%Y/%m/%d %H:%M:%S").replace(second=0)
+                                        formatted_date = date_obj.strftime("%Y-%m-%d %H:%M:%S")
+                                        announcement["start_time"] = formatted_date
+                                    except Exception as e:
+                                        pass
                                 filtered_list.append(announcement)
                             elif "调频" in clean_title:
-                                gacha_events[announcement['ann_id']] = announcement
-                    elif item["type_label"] == "游戏公告":
-                        for announcement in item["list"]:
-                            clean_title = remove_html_tags(announcement["title"])
-                            if "更新说明" in clean_title:
-                                announcement["title"] = "绝区零 " + str(extract_floats(clean_title)[0]) + " 版本"
+                                if '喧哗奏鸣' in clean_title:
+                                    weapon_names = extract_zzz_weapon_names(ann_content['content'])
+                                    clean_title = f"【喧哗奏鸣】调频: {", ".join(weapon_names)}"
+                                else:
+                                    character_names = extract_zzz_character_names(ann_content['content'])
+                                    gacha_names = re.findall(r'「([^」]+)」', clean_title)
+                                    clean_title = f"【{", ".join(gacha_names)}】调频: {", ".join(character_names)}"
+                                announcement["title"] = clean_title
                                 announcement["bannerImage"] = announcement.get("banner", "")
-                                announcement["event_type"] = "version"
+                                announcement["event_type"] = "gacha"
+                                ann_content_start_time = extract_zzz_gacha_start_time(ann_content['content'])
+                                if f"{version_now}版本" in ann_content_start_time:
+                                    announcement["start_time"] = version_begin_time
+                                else:
+                                    try:
+                                        date_obj = datetime.strptime(extract_clean_time(ann_content_start_time), "%Y/%m/%d %H:%M:%S").replace(second=0)
+                                        formatted_date = date_obj.strftime("%Y-%m-%d %H:%M:%S")
+                                        announcement["start_time"] = formatted_date
+                                    except Exception as e:
+                                        pass
                                 filtered_list.append(announcement)
-                ann_content_response = session.get(ann_content_urls[key], timeout=(5, 20))
-                ann_content_response.raise_for_status()
-                ann_content_data = ann_content_response.json()
-                # logging.info("\n"*3 + key + str(ann_content_data) + "\n"*3)
-                # logging.info("\n"*3 + str(ann_content_data['data']['list'][0]['list']) + "\n"*3)
-                for announcement in ann_content_data['data']['list']:
-                    # logging.info("\n"*3 + str(announcement) + "\n"*3)
-                    clean_title = remove_html_tags(announcement["title"])
-                    if '调频' in clean_title:
-                        if '喧哗奏鸣' in clean_title:
-                            weapon_names = extract_zzz_weapon_names(announcement['content'])
-                            clean_title = f"【喧哗奏鸣】调频: {", ".join(weapon_names)}"
-                        else:
-                            character_names = extract_zzz_character_names(announcement['content'])
-                            gacha_names = re.findall(r'「([^」]+)」', clean_title)
-                            clean_title = f"【{", ".join(gacha_names)}】调频: {", ".join(character_names)}"
-                        # logging.info(f"\n\n\n {key} {announcement} \n\n\n")
-                        announcement = gacha_events[announcement['ann_id']]
-                        announcement["title"] = clean_title
-                        announcement["bannerImage"] = announcement.get("banner", "")
-                        announcement["event_type"] = "gacha"
-                        filtered_list.append(announcement)
-                # logging.info("\n"*3 + "!!!" + str(filtered_list) + "\n"*3)
 
             elif key == "ww":
                 for announcement in data["game"]:
                     clean_title = remove_html_tags(announcement["tabTitle"]["zh-Hans"])
                     if "版本内容说明" in clean_title:
-                        announcement["title"] = "鸣潮 " + str(extract_floats(clean_title)[0]) + " 版本"
+                        version_now = str(extract_floats(clean_title)[0])
+                        announcement["title"] = "鸣潮 " + version_now + " 版本"
                         announcement["bannerImage"] = announcement.get("tabBanner", {}).get("zh-Hans", "")[0]
                         announcement["start_time"] = datetime.fromtimestamp(announcement["startTimeMs"] / 1000).strftime('%Y-%m-%d %H:%M:%S')
                         announcement["end_time"] = datetime.fromtimestamp(announcement["endTimeMs"] / 1000).strftime('%Y-%m-%d %H:%M:%S')
                         announcement["event_type"] = "version"
+                        version_begin_time = announcement["start_time"]
                         filtered_list.append(announcement)
+
                 for announcement in data["activity"]:
                     clean_title = remove_html_tags(announcement["tabTitle"]["zh-Hans"])
+                    ann_content_response = session.get(announcement['contentPrefix'][0] + "zh-Hans.json", timeout=(5, 20))
+                    ann_content_response.raise_for_status()
+                    ann_content_data = ann_content_response.json()
                     if title_filter(key, clean_title):
                         announcement["title"] = clean_title
                         announcement["bannerImage"] = announcement.get("tabBanner", {}).get("zh-Hans", "")[0]
                         announcement["start_time"] = datetime.fromtimestamp(announcement["startTimeMs"] / 1000).strftime('%Y-%m-%d %H:%M:%S')
                         announcement["end_time"] = datetime.fromtimestamp(announcement["endTimeMs"] / 1000).strftime('%Y-%m-%d %H:%M:%S')
                         announcement["event_type"] = "event"
+                        ann_content_start_time = extract_ww_event_start_time(ann_content_data['textContent'])
+                        if f"{version_now}版本" in ann_content_start_time:
+                            announcement["start_time"] = version_begin_time
+                        else:
+                            try:
+                                date_obj = datetime.strptime(extract_clean_time(ann_content_start_time), "%Y年%m月%d日%H:%M").replace(second=0)
+                                formatted_date = date_obj.strftime("%Y-%m-%d %H:%M:%S")
+                                announcement["start_time"] = formatted_date
+                            except Exception as e:
+                                pass
                         filtered_list.append(announcement)
                     elif "唤取" in clean_title:
-                        ann_content_response = session.get(announcement['contentPrefix'][0] + "zh-Hans.json", timeout=(5, 20))
-                        ann_content_response.raise_for_status()
-                        ann_content_data = ann_content_response.json()
                         announcement["title"] = f"【{ann_content_data["textTitle"].split('[')[1].split(']')[0]}】唤取: {ann_content_data["textTitle"].split('「')[1].split('」')[0]}"
                         announcement["bannerImage"] = announcement.get("tabBanner", {}).get("zh-Hans", "")[0]
                         announcement["start_time"] = datetime.fromtimestamp(announcement["startTimeMs"] / 1000).strftime('%Y-%m-%d %H:%M:%S')
                         announcement["end_time"] = datetime.fromtimestamp(announcement["endTimeMs"] / 1000).strftime('%Y-%m-%d %H:%M:%S')
                         announcement["event_type"] = "gacha"
+                        ann_content_start_time = extract_ww_event_start_time(ann_content_data['textContent'])
+                        if f"{version_now}版本" in ann_content_start_time:
+                            announcement["start_time"] = version_begin_time
+                        else:
+                            try:
+                                date_obj = datetime.strptime(extract_clean_time(ann_content_start_time), "%Y年%m月%d日%H:%M").replace(second=0)
+                                formatted_date = date_obj.strftime("%Y-%m-%d %H:%M:%S")
+                                announcement["start_time"] = formatted_date
+                            except Exception as e:
+                                pass
                         filtered_list.append(announcement)
 
         except requests.exceptions.RequestException as e:
@@ -471,27 +678,37 @@ def fetch_and_save_announcements():
         try:
             for announcement in filtered_list:
                 title = announcement["title"]
-                # logging.info("\n"*3 + "!!!" + str(title) + "\n"*3)
-                if title:
-                    existing_event = Event.query.filter_by(title=title).first()
-                    if not existing_event:
-                        try:
-                            new_event = Event(
-                                title=title,
-                                game=key,
-                                data=json.dumps(announcement),
-                                start_time=datetime.strptime(announcement.get("start_time", ""), '%Y-%m-%d %H:%M:%S'),
-                                end_time=datetime.strptime(announcement.get("end_time", ""), '%Y-%m-%d %H:%M:%S'),
-                                banner_image=announcement.get("bannerImage", ""),
-                                event_type=announcement.get("event_type", ""),
-                            )
-                            db.session.add(new_event)
-                            db.session.commit()
-                        except Exception as e:
-                            db.session.rollback()
-                            print(f"Error saving event: {e}")
+                existing_event = Event.query.filter_by(title=title).first()
+                if existing_event:
+                    new_event_data = Event(
+                        title=title,
+                        game=key,
+                        data=json.dumps(announcement),
+                        start_time=datetime.strptime(announcement.get("start_time", ""), '%Y-%m-%d %H:%M:%S'),
+                        end_time=datetime.strptime(announcement.get("end_time", ""), '%Y-%m-%d %H:%M:%S'),
+                        banner_image=announcement.get("bannerImage", ""),
+                        event_type=announcement.get("event_type", ""),
+                    )
+                    update_event_fields(existing_event, new_event_data)
+                else:
+                    try:
+                        new_event = Event(
+                            title=title,
+                            game=key,
+                            data=json.dumps(announcement),
+                            start_time=datetime.strptime(announcement.get("start_time", ""), '%Y-%m-%d %H:%M:%S'),
+                            end_time=datetime.strptime(announcement.get("end_time", ""), '%Y-%m-%d %H:%M:%S'),
+                            banner_image=announcement.get("bannerImage", ""),
+                            event_type=announcement.get("event_type", ""),
+                        )
+                        db.session.add(new_event)
+                        db.session.commit()
+                    except Exception as e:
+                        db.session.rollback()
+                        print(f"Error saving event: {e}")
+
         except Exception as e:
-            print(f"Error saving to db: {repr(e)}")
+            print(f"Error processing {key} announcements: {e}")
 
 
 def scheduled_task():
@@ -532,7 +749,6 @@ def get_notice():
                 "uuid": event.uuid,
                 "event_type": event.event_type,
             })
-    # logging.info(str(results['sr']))
 
     for game, events in results.items():
         version_events = [event for event in events if "版本" in event["title"]]
@@ -573,7 +789,7 @@ def decrypt_password(encrypted_password, private_key_pem):
 def update_existing_passwords():
     users = User.query.all()
     for user in users:
-        if not user.password.startswith('scrypt:32768:8:1'):  # 检查密码是否已经加密
+        if not user.password.startswith('scrypt:32768:8:1'):
             user.set_password(user.password)
             db.session.commit()
 

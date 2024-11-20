@@ -302,9 +302,8 @@ function createTimeline(events) {
         eventElement.style.width = (event.end.getTime() - event.start.getTime()) / (86400 / pxPerDay * 1000) - 10 + "px";
         eventElement.style.top = `${index * 30 + index * 8}px`;
 
-        const eventTitle = document.createElement('span');
-        eventTitle.classList.add('event-title');
-        eventTitle.innerHTML = `${event.name}&nbsp;|&nbsp;${event.end.Format("MM-dd HH:mm")}`;
+        const eventTitleDiv = document.createElement('div');
+        eventTitleDiv.classList.add('event-title');
 
         const timeRemainingSpan = document.createElement('div');
         timeRemainingSpan.classList.add('time-remaining');
@@ -316,7 +315,11 @@ function createTimeline(events) {
         completionBox.style.backgroundColor = 'rgba(225, 225, 225, 0.5)';
         completionBox.dataset.status = '0';
         completionBox.addEventListener('click', toggleCompletionStatus);
-        eventTitle.appendChild(completionBox);
+        eventTitleDiv.appendChild(completionBox);
+
+        const eventTitle = document.createElement('span');
+        eventTitle.innerHTML = `${event.name}`;
+        eventTitleDiv.appendChild(eventTitle);
 
         refreshRemainTime(event);
         function refreshRemainTime(event) {
@@ -359,7 +362,7 @@ function createTimeline(events) {
             eventElement.style.backgroundImage = `linear-gradient(to right, ${event.color} calc(100% - 252px), #FF5000 100%)`;
         }
 
-        eventElement.appendChild(eventTitle);
+        eventElement.appendChild(eventTitleDiv);
 
         // 创建并添加带有 bannerImage 的 div
         const bannerDiv = document.createElement('div');

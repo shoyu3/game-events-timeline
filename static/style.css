@@ -187,7 +187,8 @@ input:not([type=submit]):not([type=file]).red {
     width: 20px;
     height: 20px;
     border-radius: 4px;
-    margin-left: 8px;
+    margin-left: 4px;
+    margin-right: 8px;
     font-size: 15px;
 }
 
