@@ -276,17 +276,22 @@ def extract_clean_time(html_time_str):
 
 
 def extract_ys_event_start_time(html_content):
-    soup = BeautifulSoup(html_content, 'html.parser')
-
-    reward_time_title = soup.find(text="〓获取奖励时限〓") or soup.find(text="〓活动时间〓")
-
+    if not "版本更新后" in html_content:
+        pattern = r"\d{4}/\d{2}/\d{2} \d{2}:\d{2}"
+        match = re.search(pattern, html_content)
+        if match:
+            first_datetime = match.group()
+            return first_datetime
+    soup = BeautifulSoup(html_content, "html.parser")
+    reward_time_title = soup.find(string="〓获取奖励时限〓") or soup.find(string="〓活动时间〓")
     if reward_time_title:
-        reward_time_paragraph = reward_time_title.find_next('p')
+        reward_time_paragraph = reward_time_title.find_next("p")
         if reward_time_paragraph:
             time_range = reward_time_paragraph.get_text()
             if "~" in time_range:
-                return time_range.split("~")[0].strip()
-            return time_range
+                text = re.sub("<[^>]+>", "", time_range.split("~")[0].strip())
+                return text
+            return re.sub("<[^>]+>", "", time_range)
     return ""
 
 
@@ -296,7 +301,8 @@ def extract_ys_gacha_start_time(html_content):
     if td_element == None:
         td_element = soup.find('td', {'rowspan': '5'})
         if td_element == None:
-            raise Exception(str(html_content))
+            return ""
+            # raise Exception(str(html_content))
     time_texts = []
     for child in td_element.children:
         if child.name == 'p':
@@ -349,6 +355,23 @@ def extract_zzz_event_start_time(html_content):
     return ""
 
 
+def extract_zzz_gacha_start_time(html_content):
+    soup = BeautifulSoup(html_content, "html.parser")
+    table = soup.find("table")
+    if table == None:
+        raise Exception(html_content)
+    tbody = table.find("tbody")
+    rows = tbody.find_all("tr")
+    activity_time_row = rows[1]
+    activity_time_cell = activity_time_row.find("td", {"rowspan": "2"})
+    activity_time_texts = [p.get_text() for p in activity_time_cell.find_all("p")]
+    activity_time = " ".join(activity_time_texts).strip()
+    text = activity_time_texts[0].strip()
+    if "（" in text:
+        text = text.replace("（服务器时间）", "").strip()
+    return text
+
+
 def extract_ww_event_start_time(html_content):
     soup = BeautifulSoup(html_content, 'html.parser')
     activity_time_header = soup.find('div', string=lambda text: text and '✦活动时间✦' in text)
@@ -360,20 +383,6 @@ def extract_ww_event_start_time(html_content):
                 return activity_time.split("~")[0].replace("（服务器时间）", "").strip()
             return activity_time
     return ""
-
-
-def extract_zzz_gacha_start_time(html_content):
-    soup = BeautifulSoup(html_content, 'html.parser')
-    table = soup.find('table')
-    if table == None:
-        raise Exception(html_content)
-    tbody = table.find('tbody')
-    rows = tbody.find_all('tr')
-    activity_time_row = rows[1]
-    activity_time_cell = activity_time_row.find('td', {'rowspan': '2'})
-    activity_time_texts = [p.get_text() for p in activity_time_cell.find_all('p')]
-    activity_time = ' '.join(activity_time_texts).strip()
-    return activity_time_texts[0].strip()
 
 
 def update_event_fields(db_event, new_event_data):
@@ -446,6 +455,8 @@ def fetch_and_save_announcements():
                                 announcement["bannerImage"] = announcement.get("banner", "")
                                 announcement["event_type"] = "event"
                                 ann_content_start_time = extract_ys_event_start_time(ann_content['content'])
+                                logging.info(ann_content['content'])
+                                logging.info(ann_content_start_time)
                                 if f"{version_now}版本" in ann_content_start_time:
                                     announcement["start_time"] = version_begin_time
                                 else:
