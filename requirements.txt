@@ -7,3 +7,4 @@ Pillow
 apscheduler
 cryptography
 Werkzeug
+beautifulsoup4
