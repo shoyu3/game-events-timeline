@@ -305,14 +305,18 @@ def extract_ys_gacha_start_time(html_content):
             # raise Exception(str(html_content))
     time_texts = []
     for child in td_element.children:
-        if child.name == 'p':
-            span = child.find('span')
+        if child.name == "p":
+            span = child.find("span")
             if span:
                 time_texts.append(span.get_text())
-        elif child.name == 't':
-            span = child.find('span')
+            else:
+                time_texts.append(child.get_text())
+        elif child.name == "t":
+            span = child.find("span")
             if span:
                 time_texts.append(span.get_text())
+            else:
+                time_texts.append(child.get_text())
     time_range = ' '.join(time_texts)
     if "~" in time_range:
         return time_range.split("~")[0].strip()
