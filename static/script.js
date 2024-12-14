@@ -176,7 +176,7 @@ async function encryptPassword(password, publicKey) {
 }
 
 function connectWebSocket(token) {
-    window.socket = io('https://g.4g.si/', {
+    window.socket = io('/', {
         query: { token }
     });
 
