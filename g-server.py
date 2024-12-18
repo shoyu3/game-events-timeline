@@ -28,7 +28,8 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 app = Flask(__name__)
 app.config["JSON_AS_ASCII"] = False
 
-base_dir = os.path.abspath(os.path.dirname(__file__))
+base_dir = app.root_path
+# base_dir = os.path.abspath(os.path.dirname(__file__))
 db_path = os.path.join(base_dir, 'events.sqlite3')
 app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -227,7 +228,7 @@ def title_filter(game, title):
     elif game == "sr":
         return "等奖励" in title and "模拟宇宙" not in title
     elif game == "zzz":
-        return "活动说明" in title and "全新放送" not in title and "『嗯呢』从天降" not in title
+        return "活动说明" in title and "全新放送" not in title and "『嗯呢』从天降" not in title and "特别访客" not in title
     elif game == "ww":
         return title.endswith("活动") and "感恩答谢" not in title and "签到" not in title
     return False
@@ -379,7 +380,7 @@ def extract_zzz_gacha_start_end_time(html_content):
     return text1, text2
 
 
-def extract_ww_event_start_time(html_content):
+def extract_ww_event_start_end_time(html_content):
     soup = BeautifulSoup(html_content, 'html.parser')
     activity_time_header = soup.find('div', string=lambda text: text and '✦活动时间✦' in text)
     if activity_time_header:
@@ -387,7 +388,7 @@ def extract_ww_event_start_time(html_content):
         if activity_time_div:
             activity_time = activity_time_div.get_text(strip=True)
             if "~" in activity_time:
-                return activity_time.split("~")[0].replace("（服务器时间）", "").strip()
+                return activity_time.split("~")[0].replace("（服务器时间）", "").strip(), activity_time.split("~")[1].replace("（服务器时间）", "").strip()
             return activity_time
     return ""
 
@@ -462,8 +463,8 @@ def fetch_and_save_announcements():
                                 announcement["bannerImage"] = announcement.get("banner", "")
                                 announcement["event_type"] = "event"
                                 ann_content_start_time = extract_ys_event_start_time(ann_content['content'])
-                                logging.info(ann_content['content'])
-                                logging.info(ann_content_start_time)
+                                # logging.info(ann_content['content'])
+                                # logging.info(ann_content_start_time)
                                 if f"{version_now}版本" in ann_content_start_time:
                                     announcement["start_time"] = version_begin_time
                                 else:
@@ -624,9 +625,9 @@ def fetch_and_save_announcements():
                                         pass
                                 filtered_list.append(announcement)
                             elif "调频" in clean_title:
-                                if '喧哗奏鸣' in clean_title:
+                                if '喧哗奏鸣' in clean_title or '灿烂和声' in clean_title:
                                     weapon_names = extract_zzz_weapon_names(ann_content['content'])
-                                    clean_title = f"【喧哗奏鸣】音擎调频: {", ".join(weapon_names)}"
+                                    clean_title = f"【{'喧哗奏鸣' if '喧哗奏鸣' in clean_title else '灿烂和声'}】音擎调频: {", ".join(weapon_names)}"
                                 else:
                                     character_names = extract_zzz_character_names(ann_content['content'])
                                     gacha_names = re.findall(r'「([^」]+)」', clean_title)
@@ -679,7 +680,7 @@ def fetch_and_save_announcements():
                         announcement["start_time"] = datetime.fromtimestamp(announcement["startTimeMs"] / 1000).strftime('%Y-%m-%d %H:%M:%S')
                         announcement["end_time"] = datetime.fromtimestamp(announcement["endTimeMs"] / 1000).strftime('%Y-%m-%d %H:%M:%S')
                         announcement["event_type"] = "event"
-                        ann_content_start_time = extract_ww_event_start_time(ann_content_data['textContent'])
+                        ann_content_start_time, ann_content_end_time = extract_ww_event_start_end_time(ann_content_data['textContent'])
                         if f"{version_now}版本" in ann_content_start_time:
                             announcement["start_time"] = version_begin_time
                         else:
@@ -687,6 +688,9 @@ def fetch_and_save_announcements():
                                 date_obj = datetime.strptime(extract_clean_time(ann_content_start_time), "%Y年%m月%d日%H:%M").replace(second=0)
                                 formatted_date = date_obj.strftime("%Y-%m-%d %H:%M:%S")
                                 announcement["start_time"] = formatted_date
+                                date_obj = datetime.strptime(extract_clean_time(ann_content_end_time), "%Y年%m月%d日%H:%M").replace(second=0)
+                                formatted_date = date_obj.strftime("%Y-%m-%d %H:%M:%S")
+                                announcement["end_time"] = formatted_date
                             except Exception as e:
                                 pass
                         filtered_list.append(announcement)
@@ -699,7 +703,7 @@ def fetch_and_save_announcements():
                         announcement["start_time"] = datetime.fromtimestamp(announcement["startTimeMs"] / 1000).strftime('%Y-%m-%d %H:%M:%S')
                         announcement["end_time"] = datetime.fromtimestamp(announcement["endTimeMs"] / 1000).strftime('%Y-%m-%d %H:%M:%S')
                         announcement["event_type"] = "gacha"
-                        ann_content_start_time = extract_ww_event_start_time(ann_content_data['textContent'])
+                        ann_content_start_time, ann_content_end_time = extract_ww_event_start_end_time(ann_content_data['textContent'])
                         if f"{version_now}版本" in ann_content_start_time:
                             announcement["start_time"] = version_begin_time
                         else:
@@ -707,8 +711,12 @@ def fetch_and_save_announcements():
                                 date_obj = datetime.strptime(extract_clean_time(ann_content_start_time), "%Y年%m月%d日%H:%M").replace(second=0)
                                 formatted_date = date_obj.strftime("%Y-%m-%d %H:%M:%S")
                                 announcement["start_time"] = formatted_date
+                                date_obj = datetime.strptime(extract_clean_time(ann_content_end_time), "%Y年%m月%d日%H:%M").replace(second=0)
+                                formatted_date = date_obj.strftime("%Y-%m-%d %H:%M:%S")
+                                announcement["end_time"] = formatted_date
                             except Exception as e:
                                 pass
+                                # logging.info("err: "+repr(e))
                         filtered_list.append(announcement)
 
         except requests.exceptions.RequestException as e:
@@ -749,6 +757,8 @@ def fetch_and_save_announcements():
         except Exception as e:
             print(f"Error processing {key} announcements: {e}")
 
+    cached_events = None
+
 
 def scheduled_task():
     with app.app_context():
@@ -767,39 +777,59 @@ def log_refresh_time():
         print(f"Error logging refresh time: {e}")
 
 
+cached_events = None
+
+
 @app.route("/game-events/getnotice", methods=["GET"])
 def get_notice():
+    global cached_events
+
     if is_time_to_update():
         fetch_and_save_announcements()
         update_request_log()
 
     now = datetime.now()
-    active_events = Event.query.filter(Event.end_time > now).order_by(Event.start_time.asc(), Event.end_time.asc()).all()
-    results = {}
-    for event in active_events:
-        if event.game not in results:
-            results[event.game] = []
-        if event.event_type == "gacha" or title_filter(event.game, event.title):
-            results[event.game].append({
-                "title": event.title,
-                "start_time": event.start_time.strftime('%Y-%m-%d %H:%M:%S'),
-                "end_time": event.end_time.strftime('%Y-%m-%d %H:%M:%S'),
-                "bannerImage": event.banner_image,
-                "uuid": event.uuid,
-                "event_type": event.event_type,
-            })
 
-    for game, events in results.items():
-        version_events = [event for event in events if "版本" in event["title"]]
-        other_events = [event for event in events if "版本" not in event["title"]]
-        results[game] = version_events + other_events
+    # 如果缓存为空，或者需要更新缓存
+    if cached_events is None:
+        active_events = Event.query.filter(Event.end_time > now).order_by(Event.start_time.asc(), Event.end_time.asc()).all()
+        results = {}
+        for event in active_events:
+            if event.game not in results:
+                results[event.game] = []
+            if event.event_type == "gacha" or title_filter(event.game, event.title):
+                results[event.game].append({
+                    "title": event.title,
+                    "start_time": event.start_time.strftime('%Y-%m-%d %H:%M:%S'),
+                    "end_time": event.end_time.strftime('%Y-%m-%d %H:%M:%S'),
+                    "bannerImage": event.banner_image,
+                    "uuid": event.uuid,
+                    "event_type": event.event_type,
+                })
 
-    for game, events in results.items():
-        other_events = [event for event in events if event["event_type"] != "gacha"]
-        gacha_events = [event for event in events if event["event_type"] == "gacha"]
-        results[game] = other_events + gacha_events
+        for game, events in results.items():
+            version_events = [event for event in events if "版本" in event["title"]]
+            other_events = [event for event in events if "版本" not in event["title"]]
+            results[game] = version_events + other_events
 
-    response = make_response(json.dumps(results, ensure_ascii=False))
+        for game, events in results.items():
+            other_events = [event for event in events if event["event_type"] != "gacha"]
+            gacha_events = [event for event in events if event["event_type"] == "gacha"]
+            results[game] = other_events + gacha_events
+
+        if "ww" in results:
+            ww_events = results["ww"]
+            # 将包含“武器”的事件单独提取出来
+            weapon_events = [event for event in ww_events if "武器" in event["title"]]
+            non_weapon_events = [event for event in ww_events if "武器" not in event["title"]]
+            # 将非武器事件排在前面，武器事件排在最后
+            results["ww"] = non_weapon_events + weapon_events
+
+        cached_events = results
+    # else:
+        # logging.info("命中缓存")
+
+    response = make_response(json.dumps(cached_events, ensure_ascii=False))
     response.headers['Content-Type'] = 'application/json; charset=utf-8'
     return response
 
@@ -834,7 +864,8 @@ def update_existing_passwords():
 
 
 def validate_geetest(validate):
-    geetest_config = app.config['GEETEST_CONFIG']
+    global geetest_config
+    # geetest_config = app.config['GEETEST_CONFIG']
     captcha_id = geetest_config.get('captchaId')
     captcha_key = geetest_config.get('captchaKey')
     lot_number = validate.get('lot_number', '')
@@ -981,7 +1012,8 @@ def home():
 
 @app.route("/game-events")
 def game_events():
-    geetest_config = app.config['GEETEST_CONFIG']
+    global geetest_config
+    # geetest_config = app.config['GEETEST_CONFIG']
     captcha_id = geetest_config.get('captchaId')
     return render_template("game-events.html", nowYear=datetime.now().year, captchaId=captcha_id)
 
@@ -1019,18 +1051,25 @@ def dynamic_favicon():
 
 def load_geetest_config():
     geetest_config_path = os.path.join(base_dir, 'geetest.json')
+    # logging.info(geetest_config_path)
     with open(geetest_config_path, 'r', encoding='utf-8') as f:
         geetest_config = json.load(f)
     return geetest_config
 
 
+@app.before_request
+def initialize_resources():
+    global geetest_config
+    geetest_config = load_geetest_config()
+
+
 if __name__ == "__main__":
+    geetest_config = load_geetest_config()
     with app.app_context():
         db.create_all()
         initialize_user()
         update_existing_passwords()
         scheduler = BackgroundScheduler()
-        geetest_config = load_geetest_config()
         app.config['GEETEST_CONFIG'] = geetest_config
         scheduler.add_job(scheduled_task, 'cron', hour=9, minute=0)
         scheduler.add_job(scheduled_task, 'cron', hour=11, minute=0)

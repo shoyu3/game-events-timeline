@@ -57,6 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
+let eventsSettings = {};
 function loadEvents(socket) {
     fetch('game-events/getnotice')
         .then(response => response.json())
@@ -75,6 +76,11 @@ function loadEvents(socket) {
                             game: type,
                             type: event.event_type,
                         };
+                        if (newEvent.bannerImage === "") {
+                            if (newEvent.game === "sr") {
+                                newEvent.bannerImage = "/static/images/sr.png";
+                            }
+                        }
                         events.push(newEvent);
                     });
                 }
@@ -85,6 +91,12 @@ function loadEvents(socket) {
                 createTimeline(events);
                 setInterval(updateCurrentTimeMarker, 100);
                 createLegend();
+                const savedSettings = localStorage.getItem('events_setting');
+                if (savedSettings) {
+                    eventsSettings = JSON.parse(savedSettings);
+                }
+                loadHiddenStatus();
+                loadCompletionStatus();
             } else {
                 const legendContainer = document.querySelector('.legend-list');
                 legendContainer.innerHTML = "当前无事件";
@@ -192,7 +204,9 @@ function connectWebSocket(token) {
     });
 
     socket.on('settings_updated', (data) => {
+        eventsSettings = data;
         localStorage.setItem('events_setting', JSON.stringify(data));
+        loadHiddenStatus();
         loadCompletionStatus();
     });
 
@@ -293,6 +307,7 @@ function createTimeline(events) {
         eventElement.dataset.end = event.end.getTime();
         eventElement.dataset.bannerImage = event.bannerImage;
         eventElement.dataset.uuid = event.uuid;
+        eventElement.dataset.game = event.game;
         eventElement.style.backgroundColor = event.color;
 
         const eventStartOffset = (event.start.getTime() - timelineStart.getTime()) / totalTimeInMs;
@@ -376,7 +391,12 @@ function createTimeline(events) {
             } else if (event.game === "zzz") {
                 bannerDiv.style.backgroundPosition = 'center 34px';
             } else {
-                bannerDiv.style.backgroundPosition = 'center';
+                if (!event.name.includes("武器")) {
+                    bannerDiv.style.backgroundPosition = 'center 35%';
+                }
+                else {
+                    bannerDiv.style.backgroundPosition = 'center center';
+                }
             }
         } else {
             bannerDiv.style.backgroundPosition = 'center';
@@ -535,8 +555,12 @@ function createLegend() {
         legendItem.classList.add('legend-item');
 
         const colorBox = document.createElement('span');
+        colorBox.dataset.game = activity.type;
         colorBox.classList.add('color-box');
         colorBox.style.backgroundColor = getColor(activity.type);
+
+        // 添加点击事件监听器
+        colorBox.addEventListener('click', () => toggleGameEventsVisibility(activity.type));
 
         const label = document.createElement('span');
         label.classList.add('label');
@@ -545,6 +569,99 @@ function createLegend() {
         legendItem.appendChild(colorBox);
         legendItem.appendChild(label);
         legendContainer.appendChild(legendItem);
+    });
+}
+
+window.hiddenEvents = {}; // 存储每个事件的隐藏状态
+
+function toggleGameEventsVisibility(gameType) {
+    const events = document.querySelectorAll('.event');
+
+    events.forEach(event => {
+        if (event.dataset.game === gameType) {
+            const uuid = event.dataset.uuid;
+            const isHidden = window.hiddenEvents[uuid] || false;
+
+            // 切换隐藏状态
+            window.hiddenEvents[uuid] = !isHidden;
+            event.style.display = isHidden ? 'flex' : 'none';
+            // 更新 eventsSettings
+            if (!eventsSettings[uuid]) {
+                eventsSettings[uuid] = {};
+            }
+            eventsSettings[uuid].isHidden = !isHidden;
+        }
+    });
+    recalculateEventPositions();
+    updateColorBoxStyle(gameType);
+    saveEventsSettings();
+}
+
+function saveEventsSettings() {
+    localStorage.setItem('events_setting', JSON.stringify(eventsSettings));
+    updateSettings(eventsSettings, socket);
+}
+
+function recalculateEventPositions() {
+    const events = document.querySelectorAll('.event');
+    let currentTop = 0; // 当前事件的顶部位置
+
+    events.forEach(event => {
+        if (event.style.display !== 'none') {
+            // 如果事件未隐藏，调整其位置
+            event.style.top = `${currentTop}px`;
+            currentTop += event.offsetHeight + 8; // 增加事件高度和间距
+        }
+    });
+}
+
+function loadHiddenStatus() {
+    const events = document.querySelectorAll('.event');
+
+    events.forEach(event => {
+        const uuid = event.dataset.uuid;
+        const isHidden = eventsSettings[uuid]?.isHidden || false;
+
+        if (isHidden) {
+            event.style.display = 'none';
+        } else {
+            event.style.display = 'flex';
+        }
+    });
+    initializeColorBoxStyles();
+    recalculateEventPositions();
+}
+
+
+function updateColorBoxStyle(gameType) {
+    const colorBox = document.querySelector(`.color-box[data-game="${gameType}"]`);
+    if (!colorBox) return;
+
+    // 检查当前游戏类型的事件是否全部隐藏
+    const isAllHidden = Array.from(document.querySelectorAll(`.event[data-game="${gameType}"]`)).every(event => event.style.display === 'none');
+    console.log(isAllHidden)
+
+    if (isAllHidden) {
+        // 如果全部隐藏，设置为虚线边框空心
+        // colorBox.style.width = "17px";
+        // colorBox.style.height = "17px";
+        colorBox.style.border = '2px dashed ' + getColor(gameType);
+        colorBox.style.backgroundColor = 'transparent';
+    } else {
+        // 如果显示，设置为实心
+        // colorBox.style.width = "20px";
+        // colorBox.style.height = "20px";
+        // colorBox.style.border = 'none';
+        colorBox.style.border = '2px solid ' + getColor(gameType);
+        colorBox.style.backgroundColor = getColor(gameType);
+    }
+}
+
+function initializeColorBoxStyles() {
+    const activityTypes = ['ys', 'sr', 'zzz', 'ww']; // 游戏类型
+
+    activityTypes.forEach(gameType => {
+        updateColorBoxStyle(gameType);
     });
 }
 
@@ -625,6 +742,8 @@ document.querySelector('.close-btn').addEventListener('click', function () {
 function toggleCompletionStatus(event) {
     event.stopPropagation();
     const box = event.target;
+    const eventElement = box.closest('.event');
+    const uuid = eventElement.dataset.uuid;
     const currentStatus = box.dataset.status;
     let newStatus;
 
@@ -650,56 +769,40 @@ function toggleCompletionStatus(event) {
     }
 
     box.dataset.status = newStatus;
-    saveCompletionStatus();
+    if (!eventsSettings[uuid]) {
+        eventsSettings[uuid] = {};
+    }
+    eventsSettings[uuid].isCompleted = newStatus;
+    saveEventsSettings();
 }
 
-function saveCompletionStatus() {
-    const events = document.querySelectorAll('.event');
-    const eventsSettings = {};
-
-    events.forEach(event => {
-        const uuid = event.dataset.uuid;
-        const completionBox = event.querySelector('.completion-box');
-        const status = completionBox.dataset.status;
-
-        eventsSettings[uuid] = {
-            isCompleted: status
-        };
-    });
-
-    localStorage.setItem('events_setting', JSON.stringify(eventsSettings));
-    updateSettings(eventsSettings, socket);
-}
 
 function loadCompletionStatus() {
-    const eventsSettings = JSON.parse(localStorage.getItem('events_setting')) || {};
     const events = document.querySelectorAll('.event');
 
     events.forEach(event => {
         const uuid = event.dataset.uuid;
         const completionBox = event.querySelector('.completion-box');
+        const status = eventsSettings[uuid]?.isCompleted || '0';
 
-        if (eventsSettings[uuid] && eventsSettings[uuid].isCompleted) {
-            const status = eventsSettings[uuid].isCompleted;
-            completionBox.dataset.status = status;
+        completionBox.dataset.status = status;
 
-            switch (status) {
-                case '1':
-                    completionBox.style.border = '2px solid lightgreen';
-                    completionBox.style.backgroundColor = '#6f67';
-                    completionBox.innerHTML = "✅";
-                    break;
-                case '2':
-                    completionBox.style.border = '2px solid yellow';
-                    completionBox.style.backgroundColor = 'rgba(255, 255, 0, 0.5)';
-                    completionBox.innerHTML = "⏩";
-                    break;
-                default:
-                    completionBox.style.border = '2px dashed lightgrey';
-                    completionBox.style.backgroundColor = 'rgba(225, 225, 225, 0.5)';
-                    completionBox.innerHTML = "";
-                    break;
-            }
+        switch (status) {
+            case '1':
+                completionBox.style.border = '2px solid lightgreen';
+                completionBox.style.backgroundColor = '#6f67';
+                completionBox.innerHTML = "✅";
+                break;
+            case '2':
+                completionBox.style.border = '2px solid yellow';
+                completionBox.style.backgroundColor = 'rgba(255, 255, 0, 0.5)';
+                completionBox.innerHTML = "⏩";
+                break;
+            default:
+                completionBox.style.border = '2px dashed lightgrey';
+                completionBox.style.backgroundColor = 'rgba(225, 225, 225, 0.5)';
+                completionBox.innerHTML = "";
+                break;
         }
     });
 }
