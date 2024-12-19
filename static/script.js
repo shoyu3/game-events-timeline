@@ -1,3 +1,5 @@
+"use strict";
+
 window.remainingTimeInterval = null;
 window.totalDays = 0;
 window.pxPerDay = 36;
@@ -639,7 +641,7 @@ function updateColorBoxStyle(gameType) {
 
     // 检查当前游戏类型的事件是否全部隐藏
     const isAllHidden = Array.from(document.querySelectorAll(`.event[data-game="${gameType}"]`)).every(event => event.style.display === 'none');
-    console.log(isAllHidden)
+    // console.log(isAllHidden)
 
     if (isAllHidden) {
         // 如果全部隐藏，设置为虚线边框空心
