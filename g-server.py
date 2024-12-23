@@ -394,7 +394,7 @@ def extract_ww_event_start_end_time(html_content):
 
 
 def update_event_fields(db_event, new_event_data):
-    fields_to_update = ['game', 'data', 'start_time', 'end_time', 'banner_image', 'event_type']
+    fields_to_update = ['data', 'start_time', 'end_time', 'banner_image', 'event_type']  # 'game',
     for field in fields_to_update:
         new_value = getattr(new_event_data, field)
         if field == 'data':
@@ -427,13 +427,13 @@ def fetch_and_save_announcements():
         try:
             version_now = "1.0"
             version_begin_time = "2024-11-01 00:00:01"
-            response = session.get(url, timeout=(5, 20))
+            response = session.get(url, timeout=(5, 30))
             response.raise_for_status()
             filtered_list = []
             data = response.json()
 
             if key != "ww":
-                ann_content_response = session.get(ann_content_urls[key], timeout=(5, 20))
+                ann_content_response = session.get(ann_content_urls[key], timeout=(5, 30))
                 ann_content_response.raise_for_status()
                 ann_content_data = ann_content_response.json()
                 content_map = {item['ann_id']: item for item in ann_content_data['data']['list']}
