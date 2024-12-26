@@ -1057,10 +1057,20 @@ def load_geetest_config():
     return geetest_config
 
 
-@app.before_request
-def initialize_resources():
-    global geetest_config
-    geetest_config = load_geetest_config()
+# @app.before_request
+# def initialize_resources():
+#     global geetest_config
+
+geetest_config = load_geetest_config()
+app.config['GEETEST_CONFIG'] = geetest_config
+
+scheduler = BackgroundScheduler()
+scheduler.add_job(scheduled_task, 'cron', hour=9, minute=0)
+scheduler.add_job(scheduled_task, 'cron', hour=11, minute=0)
+scheduler.add_job(scheduled_task, 'cron', hour=12, minute=30)
+scheduler.add_job(scheduled_task, 'cron', hour=18, minute=0)
+scheduler.add_job(scheduled_task, 'cron', hour=22, minute=0)
+scheduler.start()
 
 
 if __name__ == "__main__":
@@ -1069,10 +1079,4 @@ if __name__ == "__main__":
         db.create_all()
         initialize_user()
         update_existing_passwords()
-        scheduler = BackgroundScheduler()
-        app.config['GEETEST_CONFIG'] = geetest_config
-        scheduler.add_job(scheduled_task, 'cron', hour=9, minute=0)
-        scheduler.add_job(scheduled_task, 'cron', hour=11, minute=0)
-        scheduler.add_job(scheduled_task, 'cron', hour=18, minute=0)
-        scheduler.start()
     socketio.run(app, host="0.0.0.0", port=8180, allow_unsafe_werkzeug=True)
