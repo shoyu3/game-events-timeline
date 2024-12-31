@@ -224,7 +224,7 @@ def title_filter(game, title):
     if games[game] in title and "版本" in title:
         return True
     if game == "ys":
-        return "时限内" in title or (all(keyword not in title for keyword in ["魔神任务", "礼包", "纪行", "铸境研炼", "七圣召唤"]))
+        return "时限内" in title or (all(keyword not in title for keyword in ["魔神任务", "礼包", "纪行", "铸境研炼", "七圣召唤", "限时折扣"]))
     elif game == "sr":
         return "等奖励" in title and "模拟宇宙" not in title
     elif game == "zzz":
@@ -482,6 +482,10 @@ def fetch_and_save_announcements():
                                         pattern = r'「[^」]*·([^」]*)」'
                                         weapon_names = re.findall(pattern, clean_title)
                                         clean_title = f"【神铸赋形】武器祈愿: {", ".join(weapon_names)}"
+                                    elif '集录' in clean_title:
+                                        match = re.search(r'「([^」]+)」祈愿', clean_title)
+                                        gacha_name = match.group(1)
+                                        clean_title = f"【{gacha_name}】集录祈愿"
                                     else:
                                         match = re.search(r'·(.*)\(', clean_title)
                                         character_name = match.group(1)
