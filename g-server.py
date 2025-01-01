@@ -761,6 +761,7 @@ def fetch_and_save_announcements():
         except Exception as e:
             print(f"Error processing {key} announcements: {e}")
 
+    global cached_events
     cached_events = None
 
 
