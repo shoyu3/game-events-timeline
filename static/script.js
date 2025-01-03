@@ -338,20 +338,55 @@ function createTimeline(events) {
         eventTitle.innerHTML = `${event.name}`;
         eventTitleDiv.appendChild(eventTitle);
 
-        refreshRemainTime(event);
-        function refreshRemainTime(event) {
+        updateEventCountdown();
+        // 添加倒计时逻辑
+        function updateEventCountdown() {
             const now = new Date();
-            const timeRemaining = event.end.getTime() - now.getTime();
-            const days = Math.floor(timeRemaining / (1000 * 60 * 60 * 24));
-            const hours = Math.floor((timeRemaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-            timeRemainingSpan.textContent = `${days}天 ${hours}小时`;
-            const timeRemainingWidth = timeRemainingSpan.offsetWidth;
-            timeRemainingSpan.style.right = `-${(timeRemainingWidth === 0 ? 90 : timeRemainingWidth) + 10}px`;
+            const startTime = new Date(event.start);
+            const endTime = new Date(event.end);
+
+            if (now < startTime) {
+                // 活动未开始，显示开始倒计时
+                const timeRemaining = startTime.getTime() - now.getTime();
+                const days = Math.floor(timeRemaining / (1000 * 60 * 60 * 24));
+                const hours = Math.floor((timeRemaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                const minutes = Math.floor((timeRemaining % (1000 * 60 * 60)) / (1000 * 60));
+                const seconds = Math.floor((timeRemaining % (1000 * 60)) / 1000);
+
+                timeRemainingSpan.textContent = `${days}天 ${hours}小时`;
+                // timeRemainingSpan.style.color = 'orange';
+                const timeRemainingWidth = timeRemainingSpan.offsetWidth;
+                timeRemainingSpan.style.right = 'auto';
+                timeRemainingSpan.style.left = `-${(timeRemainingWidth === 0 ? 90 : timeRemainingWidth) + 10}px`;
+            } else if (now >= startTime && now <= endTime) {
+                // 活动进行中，显示剩余时间
+                const timeRemaining = endTime.getTime() - now.getTime();
+                const days = Math.floor(timeRemaining / (1000 * 60 * 60 * 24));
+                const hours = Math.floor((timeRemaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+
+                timeRemainingSpan.textContent = `${days}天 ${hours}小时`;
+                // timeRemainingSpan.style.color = 'green';
+                const timeRemainingWidth = timeRemainingSpan.offsetWidth;
+                timeRemainingSpan.style.left = 'auto';
+                timeRemainingSpan.style.right = `-${(timeRemainingWidth === 0 ? 90 : timeRemainingWidth) + 10}px`;
+            } else {
+                // 活动已结束，显示结束时间
+                const timePassed = now.getTime() - endTime.getTime();
+                const days = Math.floor(timePassed / (1000 * 60 * 60 * 24));
+                const hours = Math.floor((timePassed % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+
+                timeRemainingSpan.textContent = `${days}天 ${hours}小时`;
+                // timeRemainingSpan.style.color = 'red';
+                const timeRemainingWidth = timeRemainingSpan.offsetWidth;
+                timeRemainingSpan.style.left = 'auto';
+                timeRemainingSpan.style.right = `-${(timeRemainingWidth === 0 ? 90 : timeRemainingWidth) + 10}px`;
+            }
+
         }
 
-        setInterval(() => {
-            refreshRemainTime(event);
-        }, 100);
+        // 初始化倒计时
+        updateEventCountdown();
+        setInterval(updateEventCountdown, 1000);
 
         eventElement.addEventListener('click', function () {
             document.querySelectorAll('.event').forEach(e => {
@@ -493,11 +528,13 @@ function showBannerWithInfo(event) {
     const eventEndDateElem = bannerContainer.querySelector('.event-end-date');
     const eventRemainingTimeElem = bannerContainer.querySelector('.event-remaining-time');
 
-    if (remainingTimeInterval) {
-        clearInterval(remainingTimeInterval);
-        remainingTimeInterval = null;
+    // 清除之前的定时器
+    if (window.remainingTimeInterval) {
+        clearInterval(window.remainingTimeInterval);
+        window.remainingTimeInterval = null;
     }
 
+    // 设置事件信息
     bannerImage.src = event.bannerImage;
     if (event.name.includes("】") && event.name.includes(":")) {
         let name = event.name.split(":");
@@ -508,35 +545,57 @@ function showBannerWithInfo(event) {
     eventStartDateElem.textContent = `📣 ${formatDateTime(event.start)}`;
     eventEndDateElem.textContent = `🛑 ${formatDateTime(event.end)}`;
 
+    // 更新右下角倒计时
     const updateRemainingTime = () => {
         const now = new Date();
-        const timeRemaining = event.end.getTime() - now.getTime();
-        const days = Math.floor(timeRemaining / (1000 * 60 * 60 * 24));
-        const hours = Math.floor((timeRemaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-        const minutes = Math.floor((timeRemaining % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((timeRemaining % (1000 * 60)) / 1000);
-
-        const formattedHours = hours.toString().padStart(2, '0');
-        const formattedMinutes = minutes.toString().padStart(2, '0');
-        const formattedSeconds = seconds.toString().padStart(2, '0');
-
-        eventRemainingTimeElem.textContent = `⏳ ${days}天 ${formattedHours}:${formattedMinutes}:${formattedSeconds}`;
+        if (now < event.start) {
+            // 活动未开始
+            const timeUntilStart = event.start.getTime() - now.getTime();
+            const days = Math.floor(timeUntilStart / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((timeUntilStart % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((timeUntilStart % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((timeUntilStart % (1000 * 60)) / 1000);
+            const formattedTime = `${days}天 ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            eventRemainingTimeElem.textContent = `⏳ 距开始 ${formattedTime}`;
+        } else if (now > event.end) {
+            // 活动已结束
+            const timeSinceEnd = now.getTime() - event.end.getTime();
+            const days = Math.floor(timeSinceEnd / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((timeSinceEnd % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((timeSinceEnd % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((timeSinceEnd % (1000 * 60)) / 1000);
+            const formattedTime = `${days}天 ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            eventRemainingTimeElem.textContent = `⏳ 已结束 ${formattedTime}`;
+        } else {
+            // 活动进行中
+            const timeRemaining = event.end.getTime() - now.getTime();
+            const days = Math.floor(timeRemaining / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((timeRemaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((timeRemaining % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((timeRemaining % (1000 * 60)) / 1000);
+            const formattedTime = `${days}天 ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            eventRemainingTimeElem.textContent = `⏳ 剩余 ${formattedTime}`;
+        }
     };
 
+    // 初始化倒计时
     updateRemainingTime();
-    window.remainingTimeInterval = setInterval(updateRemainingTime, 100);
+    // 每秒更新一次倒计时
+    window.remainingTimeInterval = setInterval(updateRemainingTime, 1000);
 
+    // 显示 banner 容器
     bannerContainer.style.display = 'block';
 
+    // 关闭按钮逻辑
     const closeBtn = bannerContainer.querySelector('.close-btn');
     closeBtn.addEventListener('click', () => {
         bannerContainer.style.display = 'none';
-        clearInterval(remainingTimeInterval);
-        remainingTimeInterval = null;
+        clearInterval(window.remainingTimeInterval);
+        window.remainingTimeInterval = null;
         document.querySelectorAll('.event').forEach(e => {
             if (e.style.borderTopWidth === "3px") {
                 e.style.border = 'none';
-                e.style.top = parseInt(e.style.top) + 3 + "px"
+                e.style.top = parseInt(e.style.top) + 3 + "px";
             }
         });
     }, { once: true });

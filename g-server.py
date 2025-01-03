@@ -302,7 +302,9 @@ def extract_ys_gacha_start_time(html_content):
     if td_element == None:
         td_element = soup.find('td', {'rowspan': '5'})
         if td_element == None:
-            return ""
+            td_element = soup.find('td', {'rowspan': '9'})
+            if td_element == None:
+                return ""
             # raise Exception(str(html_content))
     time_texts = []
     for child in td_element.children:
@@ -319,6 +321,7 @@ def extract_ys_gacha_start_time(html_content):
             else:
                 time_texts.append(child.get_text())
     time_range = ' '.join(time_texts)
+    print(time_range)
     if "~" in time_range:
         return time_range.split("~")[0].strip()
     return time_range
