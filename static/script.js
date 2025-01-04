@@ -59,7 +59,16 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-let eventsSettings = {};
+let eventsSettings = {
+    hide_setting: {
+        ys: false,
+        sr: false,
+        zzz: false,
+        ww: false,
+    },
+    events: {}
+};
+
 function loadEvents(socket) {
     fetch('game-events/getnotice')
         .then(response => response.json())
@@ -93,10 +102,24 @@ function loadEvents(socket) {
                 createTimeline(events);
                 setInterval(updateCurrentTimeMarker, 100);
                 createLegend();
+
+                // 确保 eventsSettings 正确初始化
                 const savedSettings = localStorage.getItem('events_setting');
                 if (savedSettings) {
                     eventsSettings = JSON.parse(savedSettings);
+                } else {
+                    // 如果 localStorage 中没有数据，初始化 eventsSettings
+                    eventsSettings = {
+                        hide_setting: {
+                            ys: false,
+                            sr: false,
+                            zzz: false,
+                            ww: false,
+                        },
+                        events: {}
+                    };
                 }
+
                 loadHiddenStatus();
                 loadCompletionStatus();
             } else {
@@ -228,11 +251,35 @@ function fetchLatestSettings(socket) {
     })
         .then(response => response.json())
         .then(data => {
-            if (data.length === 0) {
-                updateSettings(data, socket);
-            } else {
+            if (data && typeof data === 'object') {
+                // 确保 data 包含 hide_setting 和 events
+                if (!data.hide_setting) {
+                    data.hide_setting = {
+                        ys: false,
+                        sr: false,
+                        zzz: false,
+                        ww: false,
+                    };
+                }
+                if (!data.events) {
+                    data.events = {};
+                }
+
+                eventsSettings = data;
                 localStorage.setItem('events_setting', JSON.stringify(data));
                 loadCompletionStatus();
+            } else {
+                // 如果数据为空，初始化 eventsSettings
+                eventsSettings = {
+                    hide_setting: {
+                        ys: false,
+                        sr: false,
+                        zzz: false,
+                        ww: false,
+                    },
+                    events: {}
+                };
+                localStorage.setItem('events_setting', JSON.stringify(eventsSettings));
             }
         })
         .catch(error => console.error('Error fetching latest settings:', error));
@@ -310,6 +357,7 @@ function createTimeline(events) {
         eventElement.dataset.bannerImage = event.bannerImage;
         eventElement.dataset.uuid = event.uuid;
         eventElement.dataset.game = event.game;
+        eventElement.dataset.eventType = event.type;
         eventElement.style.backgroundColor = event.color;
 
         const eventStartOffset = (event.start.getTime() - timelineStart.getTime()) / totalTimeInMs;
@@ -536,12 +584,29 @@ function showBannerWithInfo(event) {
 
     // 设置事件信息
     bannerImage.src = event.bannerImage;
-    if (event.name.includes("】") && event.name.includes(":")) {
-        let name = event.name.split(":");
-        eventNameElem.innerHTML = `${name[0]}<br>${name[1]}`;
+    if (event.type === "gacha" && event.name.includes('】')) {
+        let name = event.name.split("】");
+        let weapons = name[1].split(", ");
+        let title = weapons[0].split(": ")[0];
+        let formattedHTML = `${name[0]}】<br>${title}`;
+        if (event.name.includes(':')) {
+            weapons.forEach((weapon, index) => {
+                if (index === 0) {
+                    weapon = weapon.split(": ")[1];
+                }
+                formattedHTML += `<br>${index + 1}. ${weapon}`;
+            });
+        }
+        eventNameElem.innerHTML = formattedHTML;
     } else {
         eventNameElem.textContent = `${event.name}`;
     }
+    // if (event.name.includes("】") && event.name.includes(":")) {
+    //     let name = event.name.split(":");
+    //     eventNameElem.innerHTML = `${name[0]}<br>${name[1]}`;
+    // } else {
+    //     eventNameElem.textContent = `${event.name}`;
+    // }
     eventStartDateElem.textContent = `📣 ${formatDateTime(event.start)}`;
     eventEndDateElem.textContent = `🛑 ${formatDateTime(event.end)}`;
 
@@ -633,26 +698,18 @@ function createLegend() {
     });
 }
 
-window.hiddenEvents = {}; // 存储每个事件的隐藏状态
-
 function toggleGameEventsVisibility(gameType) {
     const events = document.querySelectorAll('.event');
 
+    // 切换隐藏状态
+    eventsSettings.hide_setting[gameType] = !eventsSettings.hide_setting[gameType];
+
     events.forEach(event => {
         if (event.dataset.game === gameType) {
-            const uuid = event.dataset.uuid;
-            const isHidden = window.hiddenEvents[uuid] || false;
-
-            // 切换隐藏状态
-            window.hiddenEvents[uuid] = !isHidden;
-            event.style.display = isHidden ? 'flex' : 'none';
-            // 更新 eventsSettings
-            if (!eventsSettings[uuid]) {
-                eventsSettings[uuid] = {};
-            }
-            eventsSettings[uuid].isHidden = !isHidden;
+            event.style.display = eventsSettings.hide_setting[gameType] ? 'none' : 'flex';
         }
     });
+
     recalculateEventPositions();
     updateColorBoxStyle(gameType);
     saveEventsSettings();
@@ -679,9 +736,19 @@ function recalculateEventPositions() {
 function loadHiddenStatus() {
     const events = document.querySelectorAll('.event');
 
+    // 确保 eventsSettings.hide_setting 存在
+    if (!eventsSettings.hide_setting) {
+        eventsSettings.hide_setting = {
+            ys: false,
+            sr: false,
+            zzz: false,
+            ww: false,
+        };
+    }
+
     events.forEach(event => {
-        const uuid = event.dataset.uuid;
-        const isHidden = eventsSettings[uuid]?.isHidden || false;
+        const gameType = event.dataset.game;
+        const isHidden = eventsSettings.hide_setting[gameType] || false;
 
         if (isHidden) {
             event.style.display = 'none';
@@ -689,30 +756,24 @@ function loadHiddenStatus() {
             event.style.display = 'flex';
         }
     });
+
     initializeColorBoxStyles();
     recalculateEventPositions();
 }
-
 
 function updateColorBoxStyle(gameType) {
     const colorBox = document.querySelector(`.color-box[data-game="${gameType}"]`);
     if (!colorBox) return;
 
     // 检查当前游戏类型的事件是否全部隐藏
-    const isAllHidden = Array.from(document.querySelectorAll(`.event[data-game="${gameType}"]`)).every(event => event.style.display === 'none');
-    // console.log(isAllHidden)
+    const isAllHidden = eventsSettings.hide_setting[gameType] || false;
 
     if (isAllHidden) {
         // 如果全部隐藏，设置为虚线边框空心
-        // colorBox.style.width = "17px";
-        // colorBox.style.height = "17px";
         colorBox.style.border = '2px dashed ' + getColor(gameType);
         colorBox.style.backgroundColor = 'transparent';
     } else {
         // 如果显示，设置为实心
-        // colorBox.style.width = "20px";
-        // colorBox.style.height = "20px";
-        // colorBox.style.border = 'none';
         colorBox.style.border = '2px solid ' + getColor(gameType);
         colorBox.style.backgroundColor = getColor(gameType);
     }
@@ -830,21 +891,25 @@ function toggleCompletionStatus(event) {
     }
 
     box.dataset.status = newStatus;
-    if (!eventsSettings[uuid]) {
-        eventsSettings[uuid] = {};
+    if (!eventsSettings.events[uuid]) {
+        eventsSettings.events[uuid] = {};
     }
-    eventsSettings[uuid].isCompleted = newStatus;
+    eventsSettings.events[uuid].isCompleted = newStatus;
     saveEventsSettings();
 }
-
 
 function loadCompletionStatus() {
     const events = document.querySelectorAll('.event');
 
+    // 确保 eventsSettings.events 存在
+    if (!eventsSettings.events) {
+        eventsSettings.events = {};
+    }
+
     events.forEach(event => {
         const uuid = event.dataset.uuid;
         const completionBox = event.querySelector('.completion-box');
-        const status = eventsSettings[uuid]?.isCompleted || '0';
+        const status = eventsSettings.events[uuid]?.isCompleted || '0';
 
         completionBox.dataset.status = status;
 
