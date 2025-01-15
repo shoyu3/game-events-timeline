@@ -330,6 +330,7 @@ def extract_ys_gacha_start_time(html_content):
 def extract_sr_event_start_time(html_content):
     pattern = r"<h1[^>]*>(?:活动时间|限时活动期)</h1>\s*<p[^>]*>(.*?)</p>"
     match = re.search(pattern, html_content, re.DOTALL)
+    # logging.info(f'{pattern} {html_content} {match}')
 
     if match:
         time_info = match.group(1)
@@ -440,7 +441,7 @@ def fetch_and_save_announcements():
                 ann_content_response.raise_for_status()
                 ann_content_data = ann_content_response.json()
                 content_map = {item['ann_id']: item for item in ann_content_data['data']['list']}
-                content_map.update({item['ann_id']: item for item in ann_content_data['data']['pic_list']})
+                pic_content_map = {item['ann_id']: item for item in ann_content_data['data']['pic_list']}
 
             if key == "ys":
                 for item in data["data"]["list"]:
@@ -533,6 +534,7 @@ def fetch_and_save_announcements():
                                 announcement["bannerImage"] = announcement.get("banner", "")
                                 announcement["event_type"] = "event"
                                 ann_content_start_time = extract_sr_event_start_time(ann_content['content'])
+                                logging.info(f"ok {ann_content_start_time} {ann_content['content']}")
                                 if f"{version_now}版本" in ann_content_start_time:
                                     announcement["start_time"] = version_begin_time
                                 else:
@@ -542,12 +544,14 @@ def fetch_and_save_announcements():
                                         announcement["start_time"] = formatted_date
                                     except Exception as e:
                                         pass
+                                # logging.info(announcement)
+                                # logging.info(content_map)
                                 filtered_list.append(announcement)
 
                 for item in data["data"]["pic_list"]:
                     for type_item in item["type_list"]:
                         for announcement in type_item["list"]:
-                            ann_content = content_map[announcement['ann_id']]
+                            ann_content = pic_content_map[announcement['ann_id']]
                             clean_title = remove_html_tags(announcement["title"])
                             if title_filter(key, clean_title):
                                 announcement["title"] = clean_title
