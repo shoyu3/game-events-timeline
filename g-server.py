@@ -235,21 +235,37 @@ def title_filter(game, title):
 
 
 def extract_sr_character_names(html_content):
+    # 正则表达式匹配限定5星角色
     pattern = r"限定5星角色「([^」]+)」"
     matches = re.findall(pattern, html_content)
-    if matches:
-        return [name.split('（')[0] for name in matches][:2]
-    else:
-        return ["角色"]
+
+    # 去重并保留顺序
+    unique_matches = []
+    seen = set()
+    for name in matches:
+        clean_name = name.split('（')[0]  # 去除括号内的内容
+        if clean_name not in seen:
+            seen.add(clean_name)
+            unique_matches.append(clean_name)
+
+    return unique_matches
 
 
 def extract_sr_weapon_names(html_content):
+    # 正则表达式匹配限定5星光锥
     pattern = r"限定5星光锥「([^」]+)」"
     matches = re.findall(pattern, html_content)
-    if matches:
-        return [name.split('（')[0] for name in matches][:2]
-    else:
-        return ["角色"]
+
+    # 去重并保留顺序
+    unique_matches = []
+    seen = set()
+    for name in matches:
+        clean_name = name.split('（')[0]  # 去除括号内的内容
+        if clean_name not in seen:
+            seen.add(clean_name)
+            unique_matches.append(clean_name)
+
+    return unique_matches
 
 
 def extract_zzz_character_names(html_content):
@@ -534,7 +550,7 @@ def fetch_and_save_announcements():
                                 announcement["bannerImage"] = announcement.get("banner", "")
                                 announcement["event_type"] = "event"
                                 ann_content_start_time = extract_sr_event_start_time(ann_content['content'])
-                                logging.info(f"ok {ann_content_start_time} {ann_content['content']}")
+                                # logging.info(f"ok {ann_content_start_time} {ann_content['content']}")
                                 if f"{version_now}版本" in ann_content_start_time:
                                     announcement["start_time"] = version_begin_time
                                 else:
@@ -573,7 +589,8 @@ def fetch_and_save_announcements():
                                     # match = re.search(r'「([^」]+)」', clean_title)
                                     # weapon_gacha_name = match.group(1)
                                     weapon_names = extract_sr_weapon_names(ann_content['content'])
-                                    clean_title = f"【流光定影, 溯回忆象】光锥跃迁: {", ".join(weapon_names)}"
+                                    gacha_names = re.findall(r'「([^」]+)」', clean_title)
+                                    clean_title = f"【{", ".join(gacha_names)}】光锥跃迁: {", ".join(weapon_names)}"
                                 else:
                                     character_names = extract_sr_character_names(ann_content['content'])
                                     gacha_names = re.findall(r'「([^」]+)」', clean_title)
@@ -611,7 +628,7 @@ def fetch_and_save_announcements():
                         for announcement in item["list"]:
                             ann_content = content_map[announcement['ann_id']]
                             clean_title = remove_html_tags(announcement["title"])
-                            if title_filter(key, clean_title):
+                            if title_filter(key, clean_title) and not "累计登录7天" in ann_content['content']:
                                 announcement["title"] = clean_title
                                 announcement["bannerImage"] = announcement.get("banner", "")
                                 announcement["event_type"] = "event"
@@ -1078,7 +1095,7 @@ app.config['GEETEST_CONFIG'] = geetest_config
 
 scheduler = BackgroundScheduler()
 scheduler.add_job(scheduled_task, 'cron', hour=9, minute=0)
-scheduler.add_job(scheduled_task, 'cron', hour=11, minute=0)
+# scheduler.add_job(scheduled_task, 'cron', hour=11, minute=0)
 scheduler.add_job(scheduled_task, 'cron', hour=12, minute=30)
 scheduler.add_job(scheduled_task, 'cron', hour=18, minute=0)
 scheduler.add_job(scheduled_task, 'cron', hour=22, minute=0)
