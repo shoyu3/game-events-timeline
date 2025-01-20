@@ -315,11 +315,11 @@ def extract_ys_event_start_time(html_content):
 def extract_ys_gacha_start_time(html_content):
     soup = BeautifulSoup(html_content, 'html.parser')
     td_element = soup.find('td', {'rowspan': '3'})
-    if td_element == None:
+    if td_element is None:
         td_element = soup.find('td', {'rowspan': '5'})
-        if td_element == None:
+        if td_element is None:
             td_element = soup.find('td', {'rowspan': '9'})
-            if td_element == None:
+            if td_element is None:
                 return ""
             # raise Exception(str(html_content))
     time_texts = []
@@ -383,7 +383,7 @@ def extract_zzz_event_start_end_time(html_content):
 def extract_zzz_gacha_start_end_time(html_content):
     soup = BeautifulSoup(html_content, "html.parser")
     table = soup.find("table")
-    if table == None:
+    if table is None:
         raise Exception(html_content)
     tbody = table.find("tbody")
     rows = tbody.find_all("tr")
@@ -501,7 +501,7 @@ def fetch_and_save_announcements():
                                     if '神铸赋形' in clean_title:
                                         pattern = r'「[^」]*·([^」]*)」'
                                         weapon_names = re.findall(pattern, clean_title)
-                                        clean_title = f"【神铸赋形】武器祈愿: {", ".join(weapon_names)}"
+                                        clean_title = f"【神铸赋形】武器祈愿: {', '.join(weapon_names)}"
                                     elif '集录' in clean_title:
                                         match = re.search(r'「([^」]+)」祈愿', clean_title)
                                         gacha_name = match.group(1)
