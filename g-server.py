@@ -64,7 +64,7 @@ def handle_connect():
 
     user_connections[userid].append(request.sid)
     join_room(str(userid))
-    print(f"User {userid} connected with session ID {request.sid}")
+    # print(f"User {userid} connected with session ID {request.sid}")
 
     emit('user_connected', {'username': username})
 
@@ -75,7 +75,7 @@ def handle_disconnect():
         if request.sid in connections:
             connections.remove(request.sid)
             leave_room(str(userid))
-            print(f"User {userid} disconnected with session ID {request.sid}")
+            # print(f"User {userid} disconnected with session ID {request.sid}")
             break
 
 
@@ -273,9 +273,8 @@ def extract_zzz_character_names(html_content):
     matches = re.findall(pattern, html_content)
     if matches:
         return matches
-    else:
+    else: 
         return ["代理人"]
-
 
 def extract_zzz_weapon_names(html_content):
     pattern = r"活动期间，限定S级音擎.*?\[(.*?)\(.*?\)\].*?以及A级音擎"
@@ -293,7 +292,7 @@ def extract_clean_time(html_time_str):
 
 
 def extract_ys_event_start_time(html_content):
-    if not "版本更新后" in html_content:
+    if "版本更新后" not in html_content:
         pattern = r"\d{4}/\d{2}/\d{2} \d{2}:\d{2}"
         match = re.search(pattern, html_content)
         if match:
@@ -337,7 +336,7 @@ def extract_ys_gacha_start_time(html_content):
             else:
                 time_texts.append(child.get_text())
     time_range = ' '.join(time_texts)
-    print(time_range)
+    # print(time_range)
     if "~" in time_range:
         return time_range.split("~")[0].strip()
     return time_range
@@ -590,11 +589,11 @@ def fetch_and_save_announcements():
                                     # weapon_gacha_name = match.group(1)
                                     weapon_names = extract_sr_weapon_names(ann_content['content'])
                                     gacha_names = re.findall(r'「([^」]+)」', clean_title)
-                                    clean_title = f"【{", ".join(gacha_names)}】光锥跃迁: {", ".join(weapon_names)}"
+                                    clean_title = f"【{', '.join(gacha_names)}】光锥跃迁: {', '.join(weapon_names)}"
                                 else:
                                     character_names = extract_sr_character_names(ann_content['content'])
                                     gacha_names = re.findall(r'「([^」]+)」', clean_title)
-                                    clean_title = f"【{", ".join(gacha_names)}】角色跃迁: {", ".join(character_names)}"
+                                    clean_title = f"【{', '.join(gacha_names)}】角色跃迁: {', '.join(character_names)}"
                                 announcement["title"] = clean_title
                                 announcement["bannerImage"] = announcement.get("img", "")
                                 announcement["event_type"] = "gacha"
@@ -628,7 +627,7 @@ def fetch_and_save_announcements():
                         for announcement in item["list"]:
                             ann_content = content_map[announcement['ann_id']]
                             clean_title = remove_html_tags(announcement["title"])
-                            if title_filter(key, clean_title) and not "累计登录7天" in ann_content['content']:
+                            if title_filter(key, clean_title) and "累计登录7天" not in ann_content['content']:
                                 announcement["title"] = clean_title
                                 announcement["bannerImage"] = announcement.get("banner", "")
                                 announcement["event_type"] = "event"
@@ -655,11 +654,11 @@ def fetch_and_save_announcements():
                             elif "调频" in clean_title:
                                 if '喧哗奏鸣' in clean_title or '灿烂和声' in clean_title:
                                     weapon_names = extract_zzz_weapon_names(ann_content['content'])
-                                    clean_title = f"【{'喧哗奏鸣' if '喧哗奏鸣' in clean_title else '灿烂和声'}】音擎调频: {", ".join(weapon_names)}"
+                                    clean_title = f"【{'喧哗奏鸣' if '喧哗奏鸣' in clean_title else '灿烂和声'}】音擎调频: {', '.join(weapon_names)}"
                                 else:
                                     character_names = extract_zzz_character_names(ann_content['content'])
                                     gacha_names = re.findall(r'「([^」]+)」', clean_title)
-                                    clean_title = f"【{", ".join(gacha_names)}】代理人调频: {", ".join(character_names)}"
+                                    clean_title = f"【{' , '.join(gacha_names)}】代理人调频: {' , '.join(character_names)}"
                                 announcement["title"] = clean_title
                                 announcement["bannerImage"] = announcement.get("banner", "")
                                 announcement["event_type"] = "gacha"
@@ -726,7 +725,7 @@ def fetch_and_save_announcements():
                         gacha_type = "共鸣者"
                         if "浮声" in clean_title:
                             gacha_type = "武器"
-                        announcement["title"] = f"【{ann_content_data["textTitle"].split('[')[1].split(']')[0]}】{gacha_type}唤取: {ann_content_data["textTitle"].split('「')[1].split('」')[0]}"
+                        announcement["title"] = f"【{ann_content_data['textTitle'].split('[')[1].split(']')[0]}】{gacha_type}唤取: {ann_content_data['textTitle'].split('「')[1].split('」')[0]}"
                         announcement["bannerImage"] = announcement.get("tabBanner", {}).get("zh-Hans", "")[0]
                         announcement["start_time"] = datetime.fromtimestamp(announcement["startTimeMs"] / 1000).strftime('%Y-%m-%d %H:%M:%S')
                         announcement["end_time"] = datetime.fromtimestamp(announcement["endTimeMs"] / 1000).strftime('%Y-%m-%d %H:%M:%S')
@@ -875,7 +874,7 @@ def decrypt_password(encrypted_password, private_key_pem):
         private_key_pem,
         password=None,
     )
-    print(encrypted_password)
+    # print(encrypted_password)
     encrypted_password_bytes = base64.b64decode(encrypted_password)
     decrypted_password = private_key.decrypt(
         encrypted_password_bytes,
@@ -1109,3 +1108,4 @@ if __name__ == "__main__":
         initialize_user()
         update_existing_passwords()
     socketio.run(app, host="0.0.0.0", port=8180, allow_unsafe_werkzeug=True)
+    
