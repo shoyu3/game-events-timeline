@@ -688,10 +688,17 @@ def fetch_and_save_announcements():
                                         pass
                                 filtered_list.append(announcement)
                             elif "调频" in clean_title:
-                                if '喧哗奏鸣' in clean_title or '灿烂和声' in clean_title:
+                                w_engine_title = "音擎"
+                                if '喧哗奏鸣' in clean_title:
+                                    w_engine_title = '喧哗奏鸣'
+                                elif '灿烂和声' in clean_title:
+                                    w_engine_title = '灿烂和声'
+                                elif '激荡谐振' in clean_title:
+                                    w_engine_title = '激荡谐振'
+                                if w_engine_title != '音擎':
                                     weapon_names = extract_zzz_weapon_names(
                                         ann_content['content'])
-                                    clean_title = f"【{'喧哗奏鸣' if '喧哗奏鸣' in clean_title else '灿烂和声'}】音擎调频: {', '.join(weapon_names)}"
+                                    clean_title = f"【{w_engine_title}】音擎调频: {', '.join(weapon_names)}"
                                 else:
                                     character_names = extract_zzz_character_names(
                                         ann_content['content'])
