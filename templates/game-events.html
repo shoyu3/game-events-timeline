@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>游梦纪事 - 活动时间线 - G.Kan.Li</title>
+    <title>游梦纪事 - 活动时间线</title>
     <meta name="referrer" content="never">
     <!-- <meta name="referrer" content="no-referrer"> -->
     <link rel="icon" type="image/png" href="/favicon">
@@ -20,17 +20,28 @@
     <div class="left-corner-container">
         <center class="login-container label">
             <div class="login-form hide">
-                <span>账号</span><br><input name="username" type="text" maxlength="16"><br>
-                <span>密码</span><br><input name="password" type="password" maxlength="32"><br><br>
-                <button class="login-btn">确认登录</button>
+                <form onsubmit="return false">
+                    <span>账号</span><br><input name="username" type="text" maxlength="16"><br>
+                    <span>密码</span><br><input name="password" type="password" maxlength="32"><br><br>
+                    <button class="login-btn">确认登录</button>
+                </form>
             </div>
         </center>
         <div class="legend-container">
             <div class="legend-inner">
                 <div class="legend-list label">Loading...</div>
                 <hr>
-                <div class="label">游梦纪事 - 活动时间线<br><a href="https://github.com/shoyu3/game-events-timeline"
-                        target="_blank">Github 项目主页</a><br>&copy; {{ nowYear }} <a href="https://g.kan.li">坎·璃</a>
+                <select id="sort-select" class="sort-select">
+                    <option value="default">按游戏默认顺序</option>
+                    <option value="end-time">按活动结束时间升序</option>
+                </select>
+                <hr>
+                <div class="label">游梦纪事 - 活动时间线<br>
+                    <a href="https://github.com/shoyu3/game-events-timeline" target="_blank"
+                        style="vertical-align: middle;">Github</a>
+                    <img src="https://img.shields.io/github/stars/shoyu3/game-events-timeline?style=social&label=Star"
+                        style="vertical-align: middle;" width="70" height="20">
+                    <br>© 2025 <a href="https://shoyu.top">Shoyu</a>
                 </div>
             </div>
             <button class="toggle-btn">▼</button>

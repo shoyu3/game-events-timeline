@@ -321,3 +321,16 @@ input:not([type=submit]):not([type=file]).red {
 .logout-btn.red {
     background-color: #ff5000;
 }
+
+.sort-container {
+    margin-top: 10px;
+    text-align: center;
+}
+
+.sort-select {
+    padding: 5px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+    background-color: #fff;
+    cursor: pointer;
+}

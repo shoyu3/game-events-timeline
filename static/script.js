@@ -3,6 +3,7 @@
 window.remainingTimeInterval = null;
 window.totalDays = 0;
 window.pxPerDay = 36;
+window.initialEvents = [];
 
 document.addEventListener('DOMContentLoaded', () => {
     const token = localStorage.getItem('token');
@@ -14,6 +15,13 @@ document.addEventListener('DOMContentLoaded', () => {
         loadEvents();
         addLoginButton();
     }
+
+    const sortSelect = document.querySelector("#sort-select");
+    sortSelect.addEventListener('change', function () {
+        eventsSettings.sortOrder = sortSelect.value;
+        saveEventsSettings();
+        sortEvents();
+    });
 
     const toggleBtn = document.querySelector('.toggle-btn');
     const loginContainer = document.querySelector('.login-container');
@@ -66,7 +74,8 @@ let eventsSettings = {
         zzz: false,
         ww: false,
     },
-    events: {}
+    events: {},
+    sortOrder: 'default'
 };
 
 function loadEvents(socket) {
@@ -116,12 +125,16 @@ function loadEvents(socket) {
                             zzz: false,
                             ww: false,
                         },
-                        events: {}
+                        events: {},
+                        sortOrder: 'default'
                     };
                 }
 
                 loadHiddenStatus();
                 loadCompletionStatus();
+                const sortSelect = document.querySelector("#sort-select");
+                sortSelect.value = eventsSettings.sortOrder;
+                sortEvents();
             } else {
                 const legendContainer = document.querySelector('.legend-list');
                 legendContainer.innerHTML = "当前无事件";
@@ -233,6 +246,9 @@ function connectWebSocket(token) {
         localStorage.setItem('events_setting', JSON.stringify(data));
         loadHiddenStatus();
         loadCompletionStatus();
+        const sortSelect = document.querySelector("#sort-select");
+        sortSelect.value = eventsSettings.sortOrder;
+        sortEvents();
     });
 
     socket.on('disconnect', () => {
@@ -264,6 +280,9 @@ function fetchLatestSettings(socket) {
                 if (!data.events) {
                     data.events = {};
                 }
+                if (!data.sortOrder) {
+                    data.sortOrder = 'default';
+                }
 
                 eventsSettings = data;
                 localStorage.setItem('events_setting', JSON.stringify(data));
@@ -277,7 +296,8 @@ function fetchLatestSettings(socket) {
                         zzz: false,
                         ww: false,
                     },
-                    events: {}
+                    events: {},
+                    sortOrder: 'default'
                 };
                 localStorage.setItem('events_setting', JSON.stringify(eventsSettings));
             }
@@ -293,6 +313,12 @@ function createTimeline(events) {
     const timeline = document.querySelector('.timeline');
     const timeline_container = document.querySelector('.timeline-container');
     const dateAxis = document.querySelector('.date-axis');
+
+    // if (sortOrder === 'end-time') {
+    //     events.sort((a, b) => a.end.getTime() - b.end.getTime());
+    // } else {
+    //     events.sort((a, b) => getGameOrder(a.game) - getGameOrder(b.game));
+    // }
 
     const earliestStart = new Date(Math.min(...events.map(event => event.start.getTime())));
     const latestEnd = new Date(Math.max(...events.map(event => event.end.getTime())));
@@ -401,7 +427,7 @@ function createTimeline(events) {
                 const minutes = Math.floor((timeRemaining % (1000 * 60 * 60)) / (1000 * 60));
                 const seconds = Math.floor((timeRemaining % (1000 * 60)) / 1000);
 
-                timeRemainingSpan.textContent = `${days}天 ${hours}小时`;
+                timeRemainingSpan.textContent = `即将开始 ${days}天 ${hours}小时`;
                 // timeRemainingSpan.style.color = 'orange';
                 const timeRemainingWidth = timeRemainingSpan.offsetWidth;
                 timeRemainingSpan.style.right = 'auto';
@@ -423,7 +449,7 @@ function createTimeline(events) {
                 const days = Math.floor(timePassed / (1000 * 60 * 60 * 24));
                 const hours = Math.floor((timePassed % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
 
-                timeRemainingSpan.textContent = `${days}天 ${hours}小时`;
+                timeRemainingSpan.textContent = `已结束 ${days}天 ${hours}小时`;
                 // timeRemainingSpan.style.color = 'red';
                 const timeRemainingWidth = timeRemainingSpan.offsetWidth;
                 timeRemainingSpan.style.left = 'auto';
@@ -508,7 +534,9 @@ function createTimeline(events) {
     linestylediv.innerHTML = `.date-label-line {height:${(timeline.children.length) * 40 - 15}px!important;}`;
     document.body.appendChild(linestylediv);
     setInterval(updateTodayHighlight, 500);
-
+    initialEvents = [...document.querySelectorAll('.event')];
+    sortEvents();
+    updateCurrentTimeMarker();
     loadCompletionStatus();
 }
 
@@ -1017,4 +1045,41 @@ function addLogoutButton() {
     passwordinput.value = "";
     loginContainer.appendChild(userContainer);
     loginContainer.appendChild(logoutButton);
+}
+
+
+// 排序事件函数
+function sortEvents() {
+    const timeline = document.querySelector('.timeline');
+    let events = [];
+
+    if (eventsSettings.sortOrder === 'default') {
+        // 使用初次获取的数据
+        events = [...initialEvents];
+    } else if (eventsSettings.sortOrder === 'end-time') {
+        // 按活动结束时间升序排序
+        events = Array.from(document.querySelectorAll('.event')).sort((a, b) => {
+            const endTimeA = a.dataset.end;
+            const endTimeB = b.dataset.end;
+            return endTimeA - endTimeB;
+        });
+    }
+
+    // 清空时间轴并重新添加排序后的事件
+    timeline.innerHTML = '';
+    events.forEach(event => timeline.appendChild(event));
+
+    // 重新计算事件位置
+    recalculateEventPositions();
+}
+
+// 获取游戏顺序
+function getGameOrder(gameType) {
+    const gameOrder = {
+        'ys': 1,
+        'sr': 2,
+        'zzz': 3,
+        'ww': 4
+    };
+    return gameOrder[gameType] || 0;
 }

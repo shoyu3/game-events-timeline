@@ -8,3 +8,4 @@ apscheduler
 cryptography
 Werkzeug
 beautifulsoup4
+gunicorn

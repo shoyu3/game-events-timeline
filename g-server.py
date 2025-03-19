@@ -10,7 +10,7 @@ import string
 import base64
 import hmac
 import hashlib
-from flask import Flask, render_template, jsonify, make_response, send_file, send_from_directory, request
+from flask import Flask, render_template, jsonify, make_response, send_file, send_from_directory, request, redirect
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timedelta
 from PIL import Image, ImageDraw, ImageFont
@@ -202,11 +202,14 @@ def extract_floats(text):
 
 
 def is_time_to_update():
-    log = RequestLog.query.first()
-    if not log:
+    try:
+        log = RequestLog.query.first()
+        if not log:
+            return True
+        now = datetime.now()
+        return (now - log.last_request_time) > timedelta(hours=24)
+    except Exception as e:
         return True
-    now = datetime.now()
-    return (now - log.last_request_time) > timedelta(hours=24)
 
 
 def update_request_log():
@@ -364,7 +367,7 @@ def extract_zzz_gacha_start_end_time(html_content):
     activity_time_texts = [p.get_text()
                            for p in activity_time_cell.find_all("p")]
     # logging.info(activity_time_texts)
-    if len(activity_time_texts)>5:
+    if len(activity_time_texts) > 5:
         text1 = activity_time_texts[0]+" "+activity_time_texts[1]
         text2 = activity_time_texts[4]+" "+activity_time_texts[5]
     else:
@@ -603,12 +606,14 @@ def fetch_and_save_announcements():
                                     r'限定5星角色「([^（」]+)',
                                     ann_content['content']
                                 )
-                                five_star_characters = list(dict.fromkeys(five_star_characters))
+                                five_star_characters = list(
+                                    dict.fromkeys(five_star_characters))
                                 five_star_light_cones = re.findall(
                                     r'限定5星光锥「([^（」]+)',
                                     ann_content['content']
                                 )
-                                five_star_light_cones = list(dict.fromkeys(five_star_light_cones))
+                                five_star_light_cones = list(
+                                    dict.fromkeys(five_star_light_cones))
                                 clean_title = (
                                     f"【{', '.join(gacha_names)}】角色、光锥跃迁: "
                                     f"{', '.join(five_star_characters + five_star_light_cones)}"
@@ -1131,6 +1136,11 @@ def home():
     return render_template("home.html", nowYear=datetime.now().year)
 
 
+@app.route("/game-events/")
+def redirect_to_events():
+    return redirect('/game-events', code=301, Response=None)
+
+
 @app.route("/game-events")
 def game_events():
     global geetest_config
@@ -1172,6 +1182,11 @@ def dynamic_favicon():
     return response
 
 
+@app.errorhandler(404)
+def show_404_page(e):
+    return render_template('404.html'), 404
+
+
 def load_geetest_config():
     geetest_config_path = os.path.join(base_dir, 'geetest.json')
     # logging.info(geetest_config_path)
@@ -1179,10 +1194,6 @@ def load_geetest_config():
         geetest_config = json.load(f)
     return geetest_config
 
-
-# @app.before_request
-# def initialize_resources():
-#     global geetest_config
 
 geetest_config = load_geetest_config()
 app.config['GEETEST_CONFIG'] = geetest_config
