@@ -4,6 +4,16 @@ window.remainingTimeInterval = null;
 window.totalDays = 0;
 window.pxPerDay = 36;
 window.initialEvents = [];
+window.walkthroughBlackWords = [
+    "移涌",//ys
+    "版本",//sr
+    "位面分裂",
+    "异器盈界",
+    "花藏繁生",
+    "数据悬赏",//zzz
+    "回音盈域",//ww
+    "声弦涤荡",
+];
 
 document.addEventListener('DOMContentLoaded', () => {
     const token = localStorage.getItem('token');
@@ -15,42 +25,34 @@ document.addEventListener('DOMContentLoaded', () => {
         loadEvents();
         addLoginButton();
     }
-
     const sortSelect = document.querySelector("#sort-select");
     sortSelect.addEventListener('change', function () {
         eventsSettings.sortOrder = sortSelect.value;
         saveEventsSettings();
         sortEvents();
     });
-
     const toggleBtn = document.querySelector('.toggle-btn');
     const loginContainer = document.querySelector('.login-container');
     const legendContainer = document.querySelector('.legend-inner');
-
     toggleBtn.addEventListener('click', () => {
         loginContainer.classList.toggle('collapsed');
         legendContainer.classList.toggle('collapsed');
         toggleBtn.textContent = legendContainer.classList.contains('collapsed') ? '▲' : '▼';
         toggleBtn.style.position = legendContainer.classList.contains('collapsed') ? "static" : "absolute";
     });
-
     const usernameinput = document.querySelector("input[name=username]");
     const passwordinput = document.querySelector("input[name=password]");
-
     usernameinput.addEventListener('input', function () {
         this.classList.toggle('red', this.value.trim() === '' || this.value.length > 16);
     });
-
     passwordinput.addEventListener('input', function () {
         this.classList.toggle('red', this.value.trim() === '' || this.value.length > 32);
     });
-
     const logbtn = document.querySelector(".login-btn");
     logbtn.addEventListener("click", function () {
         let err = false;
         const username = usernameinput.value;
         const password = passwordinput.value;
-
         if (username.trim() === '' || username.length > 16) {
             usernameinput.classList.add('red');
             err = true;
@@ -105,13 +107,11 @@ function loadEvents(socket) {
                     });
                 }
             });
-
             if (events.length > 0) {
                 updateCurrentTimeMarker();
                 createTimeline(events);
                 setInterval(updateCurrentTimeMarker, 100);
                 createLegend();
-
                 // 确保 eventsSettings 正确初始化
                 const savedSettings = localStorage.getItem('events_setting');
                 if (savedSettings) {
@@ -129,7 +129,6 @@ function loadEvents(socket) {
                         sortOrder: 'default'
                     };
                 }
-
                 loadHiddenStatus();
                 loadCompletionStatus();
                 const sortSelect = document.querySelector("#sort-select");
@@ -157,7 +156,6 @@ async function login2(validate) {
     const response = await fetch('/get-public-key');
     const publicKey = await response.text();
     const encryptedPassword = await encryptPassword(password, publicKey);
-
     const loginResponse = await fetch('/login', {
         method: 'POST',
         headers: {
@@ -169,7 +167,6 @@ async function login2(validate) {
             validate: validate
         }),
     });
-
     if (loginResponse.ok) {
         const responseData = await loginResponse.json();
         localStorage.setItem('token', responseData.token);
@@ -195,14 +192,12 @@ async function logout() {
         alert('Not logged in');
         return;
     }
-
     const response = await fetch('/logout', {
         method: 'POST',
         headers: {
             'Authorization': `Bearer ${token}`,
         },
     });
-
     if (response.ok) {
         localStorage.removeItem('token');
         socket.disconnect();
@@ -229,18 +224,15 @@ function connectWebSocket(token) {
     window.socket = io('/', {
         query: { token }
     });
-
     socket.on('connect', () => {
         console.log('Connected to server');
         fetchLatestSettings(socket);
     });
-
     socket.on('user_connected', (data) => {
         const username = data.username;
         const userContainer = document.querySelector(".user-container");
         userContainer.innerHTML = `已登录: ${username}`;
     });
-
     socket.on('settings_updated', (data) => {
         eventsSettings = data;
         localStorage.setItem('events_setting', JSON.stringify(data));
@@ -250,11 +242,9 @@ function connectWebSocket(token) {
         sortSelect.value = eventsSettings.sortOrder;
         sortEvents();
     });
-
     socket.on('disconnect', () => {
         console.log('Disconnected from server');
     });
-
     return socket;
 }
 
@@ -283,7 +273,6 @@ function fetchLatestSettings(socket) {
                 if (!data.sortOrder) {
                     data.sortOrder = 'default';
                 }
-
                 eventsSettings = data;
                 localStorage.setItem('events_setting', JSON.stringify(data));
                 loadCompletionStatus();
@@ -313,26 +302,15 @@ function createTimeline(events) {
     const timeline = document.querySelector('.timeline');
     const timeline_container = document.querySelector('.timeline-container');
     const dateAxis = document.querySelector('.date-axis');
-
-    // if (sortOrder === 'end-time') {
-    //     events.sort((a, b) => a.end.getTime() - b.end.getTime());
-    // } else {
-    //     events.sort((a, b) => getGameOrder(a.game) - getGameOrder(b.game));
-    // }
-
     const earliestStart = new Date(Math.min(...events.map(event => event.start.getTime())));
     const latestEnd = new Date(Math.max(...events.map(event => event.end.getTime())));
-
     const timelineStart = new Date(earliestStart);
     timelineStart.setDate(timelineStart.getDate() - 5);
     timelineStart.setHours(0, 0, 0, 0);
-
     const timelineEnd = new Date(latestEnd);
     timelineEnd.setDate(timelineEnd.getDate() + 5);
     timelineEnd.setHours(0, 0, 0, 0);
-
     const totalTimeInMs = timelineEnd - timelineStart;
-
     window.totalDays = Math.ceil((timelineEnd - timelineStart) / (1000 * 60 * 60 * 24));
     for (let i = 0; i <= totalDays; i++) {
         const currentDate = new Date(timelineStart);
@@ -361,8 +339,10 @@ function createTimeline(events) {
             }
             label.style.marginLeft = "-8px";
             line.style.marginLeft = i * pxPerDay - 11 + "px";
-            line.style.width = "3px";
-            line.style.backgroundColor = "#ccc";
+            if (currentDate.Format("d") === "1") {
+                line.style.width = "3px";
+                line.style.backgroundColor = "#ccc";
+            }
         } else {
             line.style.marginLeft = i * pxPerDay - 10 + "px";
             label.innerHTML = `<div class="month-day today-date">${currentDate.Format("d")}</div><div class="week-day">${formatWeekDay(currentDate)}</idv>`;
@@ -385,21 +365,16 @@ function createTimeline(events) {
         eventElement.dataset.game = event.game;
         eventElement.dataset.eventType = event.type;
         eventElement.style.backgroundColor = event.color;
-
         const eventStartOffset = (event.start.getTime() - timelineStart.getTime()) / totalTimeInMs;
         const eventDuration = (event.end.getTime() - event.start.getTime()) / totalTimeInMs;
-
         eventElement.style.left = `${eventStartOffset * 100}%`;
         eventElement.style.width = (event.end.getTime() - event.start.getTime()) / (86400 / pxPerDay * 1000) - 10 + "px";
         eventElement.style.top = `${index * 30 + index * 8}px`;
-
         const eventTitleDiv = document.createElement('div');
         eventTitleDiv.classList.add('event-title');
-
         const timeRemainingSpan = document.createElement('div');
         timeRemainingSpan.classList.add('time-remaining');
         eventElement.appendChild(timeRemainingSpan);
-
         const completionBox = document.createElement('div');
         completionBox.classList.add('completion-box');
         completionBox.style.border = '2px dashed lightgrey';
@@ -407,18 +382,22 @@ function createTimeline(events) {
         completionBox.dataset.status = '0';
         completionBox.addEventListener('click', toggleCompletionStatus);
         eventTitleDiv.appendChild(completionBox);
-
         const eventTitle = document.createElement('span');
-        eventTitle.innerHTML = `${event.name}`;
+        const isBlacklisted = window.walkthroughBlackWords.some(keyword =>
+            event.name.includes(keyword)
+        );
+        if (event.type === "event" && !isBlacklisted) {
+            eventTitle.innerHTML = `${event.name} 🎦`;
+        } else {
+            eventTitle.textContent = event.name;
+        }
         eventTitleDiv.appendChild(eventTitle);
-
         updateEventCountdown();
         // 添加倒计时逻辑
         function updateEventCountdown() {
             const now = new Date();
             const startTime = new Date(event.start);
             const endTime = new Date(event.end);
-
             if (now < startTime) {
                 // 活动未开始，显示开始倒计时
                 const timeRemaining = startTime.getTime() - now.getTime();
@@ -426,7 +405,6 @@ function createTimeline(events) {
                 const hours = Math.floor((timeRemaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
                 const minutes = Math.floor((timeRemaining % (1000 * 60 * 60)) / (1000 * 60));
                 const seconds = Math.floor((timeRemaining % (1000 * 60)) / 1000);
-
                 timeRemainingSpan.textContent = `即将开始 ${days}天 ${hours}小时`;
                 // timeRemainingSpan.style.color = 'orange';
                 const timeRemainingWidth = timeRemainingSpan.offsetWidth;
@@ -437,7 +415,6 @@ function createTimeline(events) {
                 const timeRemaining = endTime.getTime() - now.getTime();
                 const days = Math.floor(timeRemaining / (1000 * 60 * 60 * 24));
                 const hours = Math.floor((timeRemaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-
                 timeRemainingSpan.textContent = `${days}天 ${hours}小时`;
                 // timeRemainingSpan.style.color = 'green';
                 const timeRemainingWidth = timeRemainingSpan.offsetWidth;
@@ -448,7 +425,6 @@ function createTimeline(events) {
                 const timePassed = now.getTime() - endTime.getTime();
                 const days = Math.floor(timePassed / (1000 * 60 * 60 * 24));
                 const hours = Math.floor((timePassed % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-
                 timeRemainingSpan.textContent = `已结束 ${days}天 ${hours}小时`;
                 // timeRemainingSpan.style.color = 'red';
                 const timeRemainingWidth = timeRemainingSpan.offsetWidth;
@@ -457,11 +433,9 @@ function createTimeline(events) {
             }
 
         }
-
         // 初始化倒计时
         updateEventCountdown();
         setInterval(updateEventCountdown, 1000);
-
         eventElement.addEventListener('click', function () {
             document.querySelectorAll('.event').forEach(e => {
                 if (e.style.borderTopWidth === "3px") {
@@ -469,27 +443,21 @@ function createTimeline(events) {
                     e.style.top = parseInt(e.style.top) + 3 + "px";
                 }
             });
-
             eventElement.style.border = '3px solid white';
             eventElement.style.top = parseInt(eventElement.style.top) - 3 + "px";
-
             if (event.bannerImage) {
                 showBannerWithInfo(event);
             }
         });
-
         const now = new Date();
         const timeRemainingInMs = event.end.getTime() - now.getTime();
         const oneDayInMs = 1000 * 60 * 60 * 24;
-
         if (timeRemainingInMs <= oneDayInMs + oneDayInMs / 2) {
             eventElement.style.backgroundImage = `linear-gradient(to right, ${event.color} calc(100% - 252px), red 100%)`;
         } else if (timeRemainingInMs <= 3 * oneDayInMs + oneDayInMs / 2) {
             eventElement.style.backgroundImage = `linear-gradient(to right, ${event.color} calc(100% - 252px), #FF5000 100%)`;
         }
-
         eventElement.appendChild(eventTitleDiv);
-
         // 创建并添加带有 bannerImage 的 div
         const bannerDiv = document.createElement('div');
         bannerDiv.classList.add('event-banner');
@@ -519,13 +487,10 @@ function createTimeline(events) {
         bannerDiv.style.width = '100px'; // 你可以根据需要调整宽度
         // console.log(event)
         eventElement.appendChild(bannerDiv);
-
         timeline.appendChild(eventElement);
         updateCurrentTimeMarker();
-
         timeline.style.marginLeft = "20px";
         timeline.style.width = totalDays * pxPerDay + "px";
-
         const currentOffset = (now.getTime() - timelineStart.getTime()) / totalTimeInMs;
         timeline_container.scrollLeft = currentOffset * totalDays * pxPerDay - timeline_container.offsetWidth / 2 + 20;
     });
@@ -544,34 +509,26 @@ function updateCurrentTimeMarker() {
     const timeline = document.querySelector('.timeline');
     const currentTimeMarker = document.querySelector('.current-time-marker') || document.createElement('div');
     const currentTimeLabel = document.querySelector('.current-time-label') || document.createElement('div');
-
     const now = new Date();
     const events = Array.from(document.querySelectorAll('.event'));
-
     const eventStartTimes = events.map(event => new Date(Number(event.dataset.start)));
     const eventEndTimes = events.map(event => new Date(Number(event.dataset.end)));
     const timelineStart = new Date(Math.min(...eventStartTimes));
     const timelineEnd = new Date(Math.max(...eventEndTimes));
-
     timelineStart.setDate(timelineStart.getDate() - 5);
     timelineStart.setHours(0, 0, 0, 0);
     timelineEnd.setDate(timelineEnd.getDate() + 5);
     timelineEnd.setHours(0, 0, 0, 0);
-
     const totalTimeInMs = timelineEnd - timelineStart;
-
     const currentOffset = (now.getTime() - timelineStart.getTime()) / totalTimeInMs;
     const offsetLeft = (now.getTime() - timelineStart.getTime()) / (86400 / pxPerDay * 1000) + "px";
-
     currentTimeMarker.classList.add('current-time-marker');
     currentTimeMarker.style.height = (document.querySelector(".timeline").children.length - 2) * 40 + "px";
     currentTimeMarker.style.left = offsetLeft;
     currentTimeMarker.style.display = 'block';
-
     currentTimeLabel.classList.add('current-time-label');
     currentTimeLabel.textContent = `${formatTime(now)}`;
     currentTimeLabel.style.left = offsetLeft;
-
     if (!document.querySelector('.current-time-marker')) {
         timeline.appendChild(currentTimeMarker);
     }
@@ -603,16 +560,25 @@ function showBannerWithInfo(event) {
     const eventStartDateElem = bannerContainer.querySelector('.event-start-date');
     const eventEndDateElem = bannerContainer.querySelector('.event-end-date');
     const eventRemainingTimeElem = bannerContainer.querySelector('.event-remaining-time');
-
-    // 清除之前的定时器
     if (window.remainingTimeInterval) {
         clearInterval(window.remainingTimeInterval);
         window.remainingTimeInterval = null;
     }
-
-    // 设置事件信息
     bannerImage.src = event.bannerImage;
-    if (event.type === "gacha" && event.name.includes('】')) {
+    let displayName = event.name;
+    const isBlacklisted = window.walkthroughBlackWords.some(keyword =>
+        displayName.includes(keyword)
+    );
+    console.log(event.type, isBlacklisted);
+    if (event.type === "event" && !isBlacklisted) {
+        // displayName = displayName.replace('🎦', '').trim();
+        eventNameElem.innerHTML = `${displayName}<br><a href="https://search.bilibili.com/all?keyword=${encodeURIComponent(displayName)}" 
+        target="_blank" style="color: #00a3ff;text-decoration: none;" rel="noreferrer">
+        【点击快速搜索攻略】
+        </a>`;
+        console.log(eventNameElem.innerHTML)
+    }
+    else if (event.type === "gacha" && event.name.includes('】')) {
         let name = event.name.split("】");
         let weapons = name[1].split(", ");
         let title = weapons[0].split(": ")[0];
@@ -629,12 +595,6 @@ function showBannerWithInfo(event) {
     } else {
         eventNameElem.textContent = `${event.name}`;
     }
-    // if (event.name.includes("】") && event.name.includes(":")) {
-    //     let name = event.name.split(":");
-    //     eventNameElem.innerHTML = `${name[0]}<br>${name[1]}`;
-    // } else {
-    //     eventNameElem.textContent = `${event.name}`;
-    // }
     eventStartDateElem.textContent = `📣 ${formatDateTime(event.start)}`;
     eventEndDateElem.textContent = `🛑 ${formatDateTime(event.end)}`;
 
@@ -675,10 +635,8 @@ function showBannerWithInfo(event) {
     updateRemainingTime();
     // 每秒更新一次倒计时
     window.remainingTimeInterval = setInterval(updateRemainingTime, 1000);
-
     // 显示 banner 容器
     bannerContainer.style.display = 'block';
-
     // 关闭按钮逻辑
     const closeBtn = bannerContainer.querySelector('.close-btn');
     closeBtn.addEventListener('click', () => {
@@ -703,41 +661,36 @@ function createLegend() {
         { type: 'zzz', name: '绝区零' },
         { type: 'ww', name: '鸣潮' }
     ];
-
     activityTypes.forEach(activity => {
         const legendItem = document.createElement('div');
         legendItem.classList.add('legend-item');
-
         const colorBox = document.createElement('span');
         colorBox.dataset.game = activity.type;
         colorBox.classList.add('color-box');
         colorBox.style.backgroundColor = getColor(activity.type);
-
         // 添加点击事件监听器
         colorBox.addEventListener('click', () => toggleGameEventsVisibility(activity.type));
-
         const label = document.createElement('span');
         label.classList.add('label');
         label.textContent = activity.name;
-
         legendItem.appendChild(colorBox);
         legendItem.appendChild(label);
         legendContainer.appendChild(legendItem);
     });
+    const legendNote = document.createElement('div');
+    legendNote.innerHTML = '🎦&nbsp;&nbsp;&nbsp;可快速搜索攻略';
+    document.querySelector('.legend-list').appendChild(legendNote);
 }
 
 function toggleGameEventsVisibility(gameType) {
     const events = document.querySelectorAll('.event');
-
     // 切换隐藏状态
     eventsSettings.hide_setting[gameType] = !eventsSettings.hide_setting[gameType];
-
     events.forEach(event => {
         if (event.dataset.game === gameType) {
             event.style.display = eventsSettings.hide_setting[gameType] ? 'none' : 'flex';
         }
     });
-
     recalculateEventPositions();
     updateColorBoxStyle(gameType);
     saveEventsSettings();
@@ -751,7 +704,6 @@ function saveEventsSettings() {
 function recalculateEventPositions() {
     const events = document.querySelectorAll('.event');
     let currentTop = 0; // 当前事件的顶部位置
-
     events.forEach(event => {
         if (event.style.display !== 'none') {
             // 如果事件未隐藏，调整其位置
@@ -763,7 +715,6 @@ function recalculateEventPositions() {
 
 function loadHiddenStatus() {
     const events = document.querySelectorAll('.event');
-
     // 确保 eventsSettings.hide_setting 存在
     if (!eventsSettings.hide_setting) {
         eventsSettings.hide_setting = {
@@ -773,11 +724,9 @@ function loadHiddenStatus() {
             ww: false,
         };
     }
-
     events.forEach(event => {
         const gameType = event.dataset.game;
         const isHidden = eventsSettings.hide_setting[gameType] || false;
-
         if (isHidden) {
             event.style.display = 'none';
         } else {
@@ -792,10 +741,8 @@ function loadHiddenStatus() {
 function updateColorBoxStyle(gameType) {
     const colorBox = document.querySelector(`.color-box[data-game="${gameType}"]`);
     if (!colorBox) return;
-
     // 检查当前游戏类型的事件是否全部隐藏
     const isAllHidden = eventsSettings.hide_setting[gameType] || false;
-
     if (isAllHidden) {
         // 如果全部隐藏，设置为虚线边框空心
         colorBox.style.border = '2px dashed ' + getColor(gameType);
@@ -809,7 +756,6 @@ function updateColorBoxStyle(gameType) {
 
 function initializeColorBoxStyles() {
     const activityTypes = ['ys', 'sr', 'zzz', 'ww']; // 游戏类型
-
     activityTypes.forEach(gameType => {
         updateColorBoxStyle(gameType);
     });
@@ -896,7 +842,6 @@ function toggleCompletionStatus(event) {
     const uuid = eventElement.dataset.uuid;
     const currentStatus = box.dataset.status;
     let newStatus;
-
     switch (currentStatus) {
         case '0':
             newStatus = '1';
@@ -928,19 +873,15 @@ function toggleCompletionStatus(event) {
 
 function loadCompletionStatus() {
     const events = document.querySelectorAll('.event');
-
     // 确保 eventsSettings.events 存在
     if (!eventsSettings.events) {
         eventsSettings.events = {};
     }
-
     events.forEach(event => {
         const uuid = event.dataset.uuid;
         const completionBox = event.querySelector('.completion-box');
         const status = eventsSettings.events[uuid]?.isCompleted || '0';
-
         completionBox.dataset.status = status;
-
         switch (status) {
             case '1':
                 completionBox.style.border = '2px solid lightgreen';
@@ -986,7 +927,6 @@ function changeTime(t) {
     const OriginalDate = Date;
     const customTime = new OriginalDate(t);
     const offset = customTime.getTime() - OriginalDate.now();
-
     window.Date = function (...args) {
         if (args.length === 0) {
             return new OriginalDate(OriginalDate.now() + offset);
@@ -994,11 +934,9 @@ function changeTime(t) {
             return new OriginalDate(...args);
         }
     };
-
     Date.now = function () {
         return OriginalDate.now() + offset;
     };
-
     Date.UTC = OriginalDate.UTC;
     Date.parse = OriginalDate.parse;
     Date.prototype = OriginalDate.prototype;
@@ -1052,7 +990,6 @@ function addLogoutButton() {
 function sortEvents() {
     const timeline = document.querySelector('.timeline');
     let events = [];
-
     if (eventsSettings.sortOrder === 'default') {
         // 使用初次获取的数据
         events = [...initialEvents];
@@ -1064,11 +1001,9 @@ function sortEvents() {
             return endTimeA - endTimeB;
         });
     }
-
     // 清空时间轴并重新添加排序后的事件
     timeline.innerHTML = '';
     events.forEach(event => timeline.appendChild(event));
-
     // 重新计算事件位置
     recalculateEventPositions();
 }
