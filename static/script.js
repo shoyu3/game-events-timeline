@@ -90,10 +90,20 @@ function loadEvents(socket) {
             ['ys', 'sr', 'zzz', 'ww'].forEach(type => {
                 if (Array.isArray(data[type])) {
                     data[type].forEach(event => {
+                        let name = '';
+                        // console.log(type, event.event_type);
+                        if (type === 'ww' && (event.title.includes("[") || event.title.includes("区域系列"))) {
+                            name = event.title;
+                        } else if (type === 'zzz' && event.event_type === 'gacha') {
+                            name = event.title;
+                        } else {
+                            name = extractTitle(event.title);
+                        }
+                        // console.log(name);
                         const newEvent = {
                             start: new Date(event.start_time),
                             end: new Date(event.end_time),
-                            name: type === 'ww' ? (event.title.includes("[") ? extractTitle(event.title) : event.title) : extractTitle(event.title),
+                            name: name,
                             title: event.title,
                             color: getColor(type),
                             bannerImage: event.bannerImage,
