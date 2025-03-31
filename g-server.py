@@ -986,9 +986,14 @@ def update_existing_passwords():
 
 def validate_geetest(validate):
     global geetest_config
-    # geetest_config = app.config['GEETEST_CONFIG']
+    if not geetest_config:  # 如果配置不存在或无效，直接返回 True（跳过验证）
+        return True
+    
     captcha_id = geetest_config.get('captchaId')
     captcha_key = geetest_config.get('captchaKey')
+    if not captcha_id or not captcha_key:  # 双重检查
+        return True
+
     lot_number = validate.get('lot_number', '')
     captcha_output = validate.get('captcha_output', '')
     pass_token = validate.get('pass_token', '')
@@ -1028,10 +1033,14 @@ def login():
     data = request.json
     username = data.get('username')
     encrypted_password = data.get('password').encode('utf-8')
-    validate = data.get('validate')
 
-    if not validate_geetest(validate):
-        return "Invalid captcha", 401
+    # 如果 Geetest 配置无效，跳过验证
+    if geetest_config is None:
+        print("Warning: Geetest is disabled. Skipping captcha validation.")
+    else:
+        validate = data.get('validate')
+        if not validate_geetest(validate):
+            return "Invalid captcha", 401
 
     password = decrypt_password(encrypted_password, private_key_pem)
 
@@ -1189,10 +1198,20 @@ def show_404_page(e):
 
 def load_geetest_config():
     geetest_config_path = os.path.join(base_dir, 'geetest.json')
-    # logging.info(geetest_config_path)
-    with open(geetest_config_path, 'r', encoding='utf-8') as f:
-        geetest_config = json.load(f)
-    return geetest_config
+    if not os.path.exists(geetest_config_path):
+        return None
+    
+    try:
+        with open(geetest_config_path, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+            # 检查必要字段是否存在且非空
+            if not config.get('captchaId') or not config.get('captchaKey'):
+                print("Warning: geetest.json is missing required fields (captchaId or captchaKey). Captcha will be disabled.")
+                return None
+            return config
+    except json.JSONDecodeError:
+        print("Warning: geetest.json is invalid. Captcha will be disabled.")
+        return None
 
 
 geetest_config = load_geetest_config()

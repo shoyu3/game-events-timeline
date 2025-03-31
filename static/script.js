@@ -5,14 +5,16 @@ window.totalDays = 0;
 window.pxPerDay = 36;
 window.initialEvents = [];
 window.walkthroughBlackWords = [
+    "版本",
     "移涌",//ys
-    "版本",//sr
-    "位面分裂",
+    "位面分裂",//sr
     "异器盈界",
     "花藏繁生",
     "数据悬赏",//zzz
+    "先遣赏金",
     "回音盈域",//ww
     "声弦涤荡",
+    "区域系列活动",
 ];
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -92,6 +94,7 @@ function loadEvents(socket) {
                             start: new Date(event.start_time),
                             end: new Date(event.end_time),
                             name: type === 'ww' ? (event.title.includes("[") ? extractTitle(event.title) : event.title) : extractTitle(event.title),
+                            title: event.title,
                             color: getColor(type),
                             bannerImage: event.bannerImage,
                             uuid: event.uuid,
@@ -143,46 +146,73 @@ function loadEvents(socket) {
 }
 
 async function login(username, password) {
-    window.userinfo = { "username": username, "password": password };
-    captchaObj.showCaptcha(); //显示验证码
+    window.userinfo = { username, password };
+    if (window.captchaObj && typeof captchaObj.showCaptcha === 'function') {
+        captchaObj.showCaptcha();
+    } else {
+        console.warn("Geetest not available, proceeding without captcha.");
+        login2({});
+    }
+}
+
+async function fetchPublicKey() {
+    try {
+        const response = await fetch('/get-public-key');
+        if (!response.ok) {
+            throw new Error('获取公钥失败');
+        }
+        return await response.text();
+    } catch (error) {
+        console.error('获取公钥错误:', error);
+        throw error; // 重新抛出以便外部捕获
+    }
 }
 
 async function login2(validate) {
     const logbtn = document.querySelector(".login-btn");
-    logbtn.disabled = true;
-    logbtn.innerHTML = "...";
-    const username = userinfo['username'];
-    const password = userinfo['password'];
-    const response = await fetch('/get-public-key');
-    const publicKey = await response.text();
-    const encryptedPassword = await encryptPassword(password, publicKey);
-    const loginResponse = await fetch('/login', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            username: username,
-            password: encryptedPassword,
-            validate: validate
-        }),
-    });
-    if (loginResponse.ok) {
-        const responseData = await loginResponse.json();
-        localStorage.setItem('token', responseData.token);
-        const loginForm = document.querySelector(".login-form");
-        loginForm.classList.add("hide");
-        connectWebSocket(responseData.token);
-        addLogoutButton();
-    } else {
-        const logbtn = document.querySelector(".login-btn");
+    const usernameInput = document.querySelector("input[name=username]");
+    const passwordInput = document.querySelector("input[name=password]");
+    try {
+        logbtn.disabled = true;
+        logbtn.innerHTML = "登录中...";
+        const loginData = {
+            username: usernameInput.value.trim(),
+            password: await encryptPassword(passwordInput.value, await fetchPublicKey())
+        };
+        if (window.captchaObj && typeof captchaObj.getValidate === 'function') {
+            loginData.validate = validate;
+        }
+        const response = await fetch('/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(loginData)
+        });
+        if (response.ok) {
+            const data = await response.json();
+            localStorage.setItem('token', data.token);
+            const loginForm = document.querySelector(".login-form");
+            loginForm.classList.add("hide");
+            addLogoutButton();
+            window.socket = connectWebSocket(data.token);
+        } else {
+            const error = await response.text();
+            throw new Error(error || '登录失败');
+        }
+    } catch (error) {
+        console.error("Login error:", error);
         logbtn.classList.add("red");
         logbtn.innerHTML = "登录失败";
         setTimeout(() => {
             logbtn.classList.remove("red");
             logbtn.innerHTML = "确认登录";
             logbtn.disabled = false;
-        }, 1500);
+        }, 2000);
+    } finally {
+        if (window.captchaObj && typeof captchaObj.reset === 'function') {
+            captchaObj.reset();
+        }
     }
 }
 
@@ -364,7 +394,29 @@ function createTimeline(events) {
         eventElement.dataset.uuid = event.uuid;
         eventElement.dataset.game = event.game;
         eventElement.dataset.eventType = event.type;
+        eventElement.dataset.title = event.title;
         eventElement.style.backgroundColor = event.color;
+        if (['ys', 'sr', 'zzz'].includes(event.game) && event.type === "gacha") {
+            const startDate = event.start;
+            const dayOfWeek = startDate.getDay();
+            if ([1].includes(dayOfWeek)) {
+                const adjustedDate = new Date(startDate);
+                const daysToWednesday = (3 - dayOfWeek + 7) % 7;
+                adjustedDate.setDate(startDate.getDate() + daysToWednesday);
+                adjustedDate.setHours(7, 0, 0, 0);
+                event.start = adjustedDate;
+            }
+        } else if (event.game === 'ww' && event.type === 'gacha') {
+            const startDate = event.start;
+            const dayOfWeek = startDate.getDay();
+            if (dayOfWeek !== 4) {
+                const adjustedDate = new Date(startDate);
+                const daysToThursday = (4 - dayOfWeek + 7) % 7;
+                adjustedDate.setDate(startDate.getDate() + daysToThursday);
+                adjustedDate.setHours(8, 0, 0, 0);
+                event.start = adjustedDate;
+            }
+        }
         const eventStartOffset = (event.start.getTime() - timelineStart.getTime()) / totalTimeInMs;
         const eventDuration = (event.end.getTime() - event.start.getTime()) / totalTimeInMs;
         eventElement.style.left = `${eventStartOffset * 100}%`;
@@ -386,7 +438,8 @@ function createTimeline(events) {
         const isBlacklisted = window.walkthroughBlackWords.some(keyword =>
             event.name.includes(keyword)
         );
-        if (event.type === "event" && !isBlacklisted) {
+        const isYsQuest = event.title.includes("时限内完成") && event.title.includes("任务");
+        if (event.type === "event" && !isBlacklisted && !isYsQuest) {
             eventTitle.innerHTML = `${event.name} 🎦`;
         } else {
             eventTitle.textContent = event.name;
@@ -471,7 +524,7 @@ function createTimeline(events) {
                 bannerDiv.style.backgroundPosition = 'center 34px';
             } else {
                 if (!event.name.includes("武器")) {
-                    bannerDiv.style.backgroundPosition = 'center 35%';
+                    bannerDiv.style.backgroundPosition = 'center 25%';
                 }
                 else {
                     bannerDiv.style.backgroundPosition = 'center center';
@@ -570,7 +623,8 @@ function showBannerWithInfo(event) {
         displayName.includes(keyword)
     );
     console.log(event.type, isBlacklisted);
-    if (event.type === "event" && !isBlacklisted) {
+    const isYsQuest = event.title.includes("时限内完成") && event.title.includes("任务");
+    if (event.type === "event" && !isBlacklisted && !isYsQuest) {
         // displayName = displayName.replace('🎦', '').trim();
         eventNameElem.innerHTML = `${displayName}<br><a href="https://search.bilibili.com/all?keyword=${encodeURIComponent(displayName)}" 
         target="_blank" style="color: #00a3ff;text-decoration: none;" rel="noreferrer">
@@ -678,7 +732,7 @@ function createLegend() {
         legendContainer.appendChild(legendItem);
     });
     const legendNote = document.createElement('div');
-    legendNote.innerHTML = '🎦&nbsp;&nbsp;&nbsp;可快速搜索攻略';
+    legendNote.innerHTML = '<span style="width: 24px;display: inline-block;text-align: center;margin-right: 8px;">🎦</span>可快速搜索攻略';
     document.querySelector('.legend-list').appendChild(legendNote);
 }
 
