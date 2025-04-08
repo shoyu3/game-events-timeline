@@ -10,6 +10,7 @@ import string
 import base64
 import hmac
 import hashlib
+from functools import wraps
 from flask import Flask, render_template, jsonify, make_response, send_file, send_from_directory, request, redirect
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timedelta
@@ -27,7 +28,10 @@ logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(levelname)s - %(message)s')
 
 app = Flask(__name__)
+app.debug = False
 app.config["JSON_AS_ASCII"] = False
+app.logger.setLevel(logging.ERROR)
+logging.getLogger('werkzeug').setLevel(logging.ERROR)
 
 base_dir = app.root_path
 # base_dir = os.path.abspath(os.path.dirname(__file__))
@@ -38,9 +42,29 @@ db = SQLAlchemy(app)
 socketio = SocketIO(app, cors_allowed_origins='*')
 
 
+def cache_control(cache_header):
+    def decorator(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            response = make_response(f(*args, **kwargs))
+            response.headers['Cache-Control'] = cache_header
+            return response
+        return wrapper
+    return decorator
+
+
 @app.route('/favicon.ico')
+@cache_control('max-age=86400')
 def favicon():
     return send_from_directory(os.path.join(app.root_path, 'static'), 'favicon.ico', mimetype='image/vnd.microsoft.icon')
+
+
+@app.route('/static/<path:path>')
+@cache_control('max-age=86400')
+def static_file(path):
+    response = aapp.make_response(send_static_file(path))
+    response.headers['Cache-Control'] = 'public, max-age=3600'
+    return response
 
 
 @socketio.on('connect')
@@ -597,17 +621,28 @@ def fetch_and_save_announcements():
                                         pass
                                 filtered_list.append(announcement)
                             elif "跃迁" in clean_title:
+                                # 提取所有活动跃迁名称
                                 gacha_names = re.findall(
-                                    r'<h1[^>]*>「([^」]+)」\s*角色活动跃迁</h1>',
+                                    r'<h1[^>]*>「([^」]+)」[^<]*活动跃迁</h1>',
                                     ann_content['content']
                                 )
-                                gacha_names = list(dict.fromkeys(gacha_names))
+                                # 进一步筛选出角色活动跃迁的名称
+                                role_gacha_names = []
+                                for name in gacha_names:
+                                    if '•' not in name:  # 排除光锥活动跃迁名称(通常包含•)
+                                        role_gacha_names.append(name)
+                                    elif '铭心之萃' in name:  # 包含"铭心之萃"的特殊情况
+                                        role_gacha_names.append(
+                                            name.split('•')[0])
+                                role_gacha_names = list(
+                                    dict.fromkeys(role_gacha_names))
                                 five_star_characters = re.findall(
                                     r'限定5星角色「([^（」]+)',
                                     ann_content['content']
                                 )
                                 five_star_characters = list(
                                     dict.fromkeys(five_star_characters))
+
                                 five_star_light_cones = re.findall(
                                     r'限定5星光锥「([^（」]+)',
                                     ann_content['content']
@@ -615,7 +650,7 @@ def fetch_and_save_announcements():
                                 five_star_light_cones = list(
                                     dict.fromkeys(five_star_light_cones))
                                 clean_title = (
-                                    f"【{', '.join(gacha_names)}】角色、光锥跃迁: "
+                                    f"【{', '.join(role_gacha_names)}】角色、光锥跃迁: "
                                     f"{', '.join(five_star_characters + five_star_light_cones)}"
                                 )
                                 announcement["title"] = clean_title
@@ -894,6 +929,7 @@ cached_events = None
 
 
 @app.route("/game-events/getnotice", methods=["GET"])
+@cache_control('no-cache')
 def get_notice():
     global cached_events
 
@@ -988,7 +1024,7 @@ def validate_geetest(validate):
     global geetest_config
     if not geetest_config:  # 如果配置不存在或无效，直接返回 True（跳过验证）
         return True
-    
+
     captcha_id = geetest_config.get('captchaId')
     captcha_key = geetest_config.get('captchaKey')
     if not captcha_id or not captcha_key:  # 双重检查
@@ -1024,6 +1060,7 @@ def validate_geetest(validate):
 
 
 @app.route('/get-public-key', methods=['GET'])
+@cache_control('no-cache')
 def get_public_key():
     return public_key_pem, 200
 
@@ -1105,6 +1142,7 @@ def save_user_settings():
 
 
 @app.route('/game-events/load-settings', methods=['GET'])
+@cache_control('no-cache')
 def load_user_settings():
     token = request.cookies.get('token')
     if not token:
@@ -1141,16 +1179,19 @@ def initialize_user():
 
 
 @app.route("/")
+@cache_control('max-age=86400')
 def home():
     return render_template("home.html", nowYear=datetime.now().year)
 
 
 @app.route("/game-events/")
+@cache_control('max-age=86400')
 def redirect_to_events():
     return redirect('/game-events', code=301, Response=None)
 
 
 @app.route("/game-events")
+@cache_control('max-age=86400')
 def game_events():
     global geetest_config
     # geetest_config = app.config['GEETEST_CONFIG']
@@ -1159,6 +1200,7 @@ def game_events():
 
 
 @app.route('/favicon')
+@cache_control('no-cache')
 def dynamic_favicon():
     size = (32, 32)
     radius = 8
@@ -1192,21 +1234,23 @@ def dynamic_favicon():
 
 
 @app.errorhandler(404)
+@cache_control('max-age=86400')
 def show_404_page(e):
-    return render_template('404.html'), 404
+    return render_template('404.html', nowYear=datetime.now().year), 404
 
 
 def load_geetest_config():
     geetest_config_path = os.path.join(base_dir, 'geetest.json')
     if not os.path.exists(geetest_config_path):
         return None
-    
+
     try:
         with open(geetest_config_path, 'r', encoding='utf-8') as f:
             config = json.load(f)
             # 检查必要字段是否存在且非空
             if not config.get('captchaId') or not config.get('captchaKey'):
-                print("Warning: geetest.json is missing required fields (captchaId or captchaKey). Captcha will be disabled.")
+                print(
+                    "Warning: geetest.json is missing required fields (captchaId or captchaKey). Captcha will be disabled.")
                 return None
             return config
     except json.JSONDecodeError:

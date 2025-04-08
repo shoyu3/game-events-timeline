@@ -36,7 +36,7 @@
 ## 🛠️ 技术栈
 
 ### 后端
-- **Python 3.8+**
+- **Python 3.10+**
 - **Flask** - Web框架
 - **SQLAlchemy** - ORM数据库管理
 - **APScheduler** - 定时任务调度
@@ -54,7 +54,6 @@
 
 ### 环境要求
 - Python 3.10+
-- pip
 
 ### 安装步骤
 ```bash
@@ -71,7 +70,7 @@ venv\Scripts\activate    # Windows
 pip install -r requirements.txt
 
 # 运行应用
-python app.py
+python g-server.py
 ```
 
 <!-- # 初始化数据库
@@ -80,9 +79,7 @@ python init_db.py -->
 ### 默认账号
 首次运行时，控制台会输出默认用户名和随机生成的密码：
 ```
-[INFO] 初始用户已创建:
-用户名: user
-密码: xxxxxxxx
+[INFO] Initialized user 'user' with random password: xxxxxxxx
 ```
 
 ## 📊 数据更新机制

@@ -1,11 +1,86 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>404</title>
+    <title>页面未找到 - 404</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: darkslateblue;
+            color: white;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        .container {
+            margin: auto;
+            text-align: center;
+            padding: 20px;
+        }
+
+        h1 {
+            font-size: 72px;
+            margin-bottom: 20px;
+            color: #e2a638;
+        }
+
+        p {
+            font-size: 24px;
+            margin-bottom: 40px;
+        }
+
+        .btn {
+            display: inline-block;
+            margin: 20px 0;
+            font-size: 24px;
+            color: #fff;
+            text-decoration: none;
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s ease;
+            padding: 12px 25px;
+            border-radius: 8px;
+            background-color: #d28800;
+        }
+
+        .btn:hover {
+            border-bottom: 2px solid #fff;
+            background-color: #e2a638;
+            transform: scale(1.05);
+        }
+
+        footer {
+            margin-top: auto;
+            text-align: center;
+            font-size: 14px;
+            color: #ccc;
+            padding: 10px;
+        }
+
+        .url {
+            color: rgb(244, 207, 0);
+            text-decoration: none;
+        }
+    </style>
 </head>
+
 <body>
-    not found
+    <div class="container">
+        <h1>404</h1>
+        <p>哎呀，页面不见啦！</p>
+        <p>您寻找的内容可能已经消失在海浪中...</p>
+        <div>
+            <a class="btn" href="/">返回首页</a>
+        </div>
+    </div>
+    <footer>
+        &copy; {{ nowYear }} <a class="url" href="https://shoyu.top">Shoyu</a> - <a class="url"
+            href="https://kokomi.cn">Kokomi.cn</a>
+    </footer>
 </body>
+
 </html>

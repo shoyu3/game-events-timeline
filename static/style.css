@@ -92,8 +92,11 @@ input:not([type=submit]):not([type=file]).red {
     text-overflow: ellipsis;
     position: sticky;
     left: 5px;
-    display: flex;
+    display: inline-block;
     z-index: 5;
+    vertical-align: middle;
+    max-width: 80%;
+    user-select: none;
 }
 
 .event-banner {
@@ -183,6 +186,9 @@ input:not([type=submit]):not([type=file]).red {
 }
 
 .completion-box {
+    display: inline-block;
+    vertical-align: middle;
+    margin-top: -4px;
     user-select: none;
     width: 20px;
     height: 20px;

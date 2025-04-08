@@ -69,6 +69,44 @@ document.addEventListener('DOMContentLoaded', () => {
             login(username, password);
         }
     });
+
+    const timelineContainer = document.querySelector('.timeline-container');
+    let isDragging = false;
+    let startX, startY, scrollLeft, scrollTop;
+
+    // 鼠标按下时记录初始位置
+    timelineContainer.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        startX = e.pageX - timelineContainer.offsetLeft;
+        startY = e.pageY - timelineContainer.offsetTop;
+        scrollLeft = timelineContainer.scrollLeft;
+        scrollTop = timelineContainer.scrollTop;
+        timelineContainer.style.cursor = 'grabbing'; // 拖动时显示抓取光标
+        e.preventDefault(); // 防止默认行为（如文本选中）
+    });
+
+    // 鼠标移动时计算偏移量并滚动
+    document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        const x = e.pageX - timelineContainer.offsetLeft;
+        const y = e.pageY - timelineContainer.offsetTop;
+        const walkX = (x - startX) * 2; // 横向拖动速度
+        const walkY = (y - startY) * 2; // 纵向拖动速度
+        timelineContainer.scrollLeft = scrollLeft - walkX;
+        timelineContainer.scrollTop = scrollTop - walkY;
+    });
+
+    // 鼠标释放时停止拖动
+    document.addEventListener('mouseup', () => {
+        isDragging = false;
+        timelineContainer.style.cursor = 'grab';
+    });
+
+    // 鼠标移出容器时停止拖动
+    timelineContainer.addEventListener('mouseleave', () => {
+        isDragging = false;
+        timelineContainer.style.cursor = 'grab';
+    });
 });
 
 let eventsSettings = {
@@ -92,7 +130,7 @@ function loadEvents(socket) {
                     data[type].forEach(event => {
                         let name = '';
                         // console.log(type, event.event_type);
-                        if (type === 'ww' && (event.title.includes("[") || event.title.includes("区域系列"))) {
+                        if (type === 'ww' && (event.title.includes("区域系列"))) {
                             name = event.title;
                         } else if (type === 'zzz' && event.event_type === 'gacha') {
                             name = event.title;
