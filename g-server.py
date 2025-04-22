@@ -1263,7 +1263,6 @@ app.config['GEETEST_CONFIG'] = geetest_config
 
 scheduler = BackgroundScheduler()
 scheduler.add_job(scheduled_task, 'cron', hour=9, minute=0)
-# scheduler.add_job(scheduled_task, 'cron', hour=11, minute=0)
 scheduler.add_job(scheduled_task, 'cron', hour=12, minute=30)
 scheduler.add_job(scheduled_task, 'cron', hour=18, minute=0)
 scheduler.add_job(scheduled_task, 'cron', hour=22, minute=0)

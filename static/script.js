@@ -74,15 +74,16 @@ document.addEventListener('DOMContentLoaded', () => {
     let isDragging = false;
     let startX, startY, scrollLeft, scrollTop;
 
-    // 鼠标按下时记录初始位置
+    // 鼠标按下时记录初始位置（仅左键）
     timelineContainer.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return; // 0表示左键，1表示中键，2表示右键
         isDragging = true;
         startX = e.pageX - timelineContainer.offsetLeft;
         startY = e.pageY - timelineContainer.offsetTop;
         scrollLeft = timelineContainer.scrollLeft;
         scrollTop = timelineContainer.scrollTop;
-        timelineContainer.style.cursor = 'grabbing'; // 拖动时显示抓取光标
-        e.preventDefault(); // 防止默认行为（如文本选中）
+        timelineContainer.style.cursor = 'grabbing';
+        e.preventDefault();
     });
 
     // 鼠标移动时计算偏移量并滚动
@@ -90,14 +91,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!isDragging) return;
         const x = e.pageX - timelineContainer.offsetLeft;
         const y = e.pageY - timelineContainer.offsetTop;
-        const walkX = (x - startX) * 2; // 横向拖动速度
-        const walkY = (y - startY) * 2; // 纵向拖动速度
+        const walkX = (x - startX); // * 2;
+        const walkY = (y - startY); // * 2;
         timelineContainer.scrollLeft = scrollLeft - walkX;
         timelineContainer.scrollTop = scrollTop - walkY;
     });
 
     // 鼠标释放时停止拖动
-    document.addEventListener('mouseup', () => {
+    document.addEventListener('mouseup', (e) => {
+        if (e.button !== 0) return; // 同样只处理左键释放
         isDragging = false;
         timelineContainer.style.cursor = 'grab';
     });
