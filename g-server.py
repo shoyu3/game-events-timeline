@@ -10,16 +10,16 @@ import string
 import base64
 import hmac
 import hashlib
+from datetime import datetime, timedelta
 from functools import wraps
 from flask import Flask, render_template, jsonify, make_response, send_file, send_from_directory, request, redirect
 from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime, timedelta
+from flask_socketio import SocketIO, emit
+from flask_socketio import join_room, leave_room
 from PIL import Image, ImageDraw, ImageFont
 from apscheduler.schedulers.background import BackgroundScheduler
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives import serialization, hashes
-from flask_socketio import SocketIO, emit
-from flask_socketio import join_room, leave_room
 from werkzeug.security import generate_password_hash, check_password_hash
 from bs4 import BeautifulSoup
 
@@ -62,8 +62,8 @@ def favicon():
 @app.route('/static/<path:path>')
 @cache_control('max-age=86400')
 def static_file(path):
-    response = aapp.make_response(send_static_file(path))
-    response.headers['Cache-Control'] = 'public, max-age=3600'
+    response = make_response(app.send_static_file(path))
+    response.headers['Cache-Control'] = 'public, max-age=86400'
     return response
 
 
@@ -759,7 +759,8 @@ def process_zzz_announcements(data, content_map, version_now, version_begin_time
         if item["type_label"] == "游戏公告":
             for announcement in item["list"]:
                 clean_title = remove_html_tags(announcement["title"])
-                if "更新说明" in clean_title:
+                # print(clean_title)
+                if "更新说明" in clean_title and "版本" in clean_title:
                     version_now = str(extract_floats(clean_title)[0])
                     announcement["title"] = "绝区零 " + version_now + " 版本"
                     announcement["bannerImage"] = announcement.get(
@@ -832,25 +833,20 @@ def process_zzz_gacha(announcement, ann_content, version_now, version_begin_time
 
     # 合并所有名称
     all_names = list(dict.fromkeys(s_agents + s_weapons))
-
     w_engine_gacha_name = ["喧哗奏鸣", "激荡谐振", "灿烂和声"]
-
     gacha_names = [x for x in gacha_names if x not in w_engine_gacha_name]
-
-    print(all_names, gacha_names)
 
     # 生成新的标题格式
     if gacha_names and all_names:
-        clean_title = f"【{'、'.join(gacha_names)}】代理人、音擎调频: {', '.join(all_names)}"
+        clean_title = f"【{', '.join(gacha_names)}】代理人、音擎调频: {', '.join(all_names)}"
     else:
         clean_title = clean_title  # 如果提取失败，保持原样
 
     announcement["title"] = clean_title
     announcement["event_type"] = "gacha"
 
-    # 4. 提取 banner 图片地址（优先从公告数据获取，否则用默认占位图）
-    banner_image = announcement.get("banner", "")  # 从公告数据直接提取 banner 字段
-    if not banner_image:  # 如果未找到，尝试从 HTML 内容提取
+    banner_image = announcement.get("banner", "")
+    if not banner_image:
         soup = BeautifulSoup(ann_content['content'], 'html.parser')
         img_tag = soup.find('img')
         if img_tag and 'src' in img_tag.attrs:
