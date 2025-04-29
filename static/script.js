@@ -124,14 +124,18 @@ let eventsSettings = {
 
 function loadEvents(socket) {
     fetch('game-events/getnotice')
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('网络响应不正常');
+            }
+            return response.json();
+        })
         .then(data => {
             const events = [];
             ['ys', 'sr', 'zzz', 'ww'].forEach(type => {
                 if (Array.isArray(data[type])) {
                     data[type].forEach(event => {
                         let name = '';
-                        // console.log(type, event.event_type);
                         if (type === 'ww' && (event.title.includes("区域系列"))) {
                             name = event.title;
                         } else if (type === 'zzz' && event.event_type === 'gacha') {
@@ -139,7 +143,6 @@ function loadEvents(socket) {
                         } else {
                             name = extractTitle(event.title);
                         }
-                        // console.log(name);
                         const newEvent = {
                             start: new Date(event.start_time),
                             end: new Date(event.end_time),
@@ -165,12 +168,10 @@ function loadEvents(socket) {
                 createTimeline(events);
                 setInterval(updateCurrentTimeMarker, 100);
                 createLegend();
-                // 确保 eventsSettings 正确初始化
                 const savedSettings = localStorage.getItem('events_setting');
                 if (savedSettings) {
                     eventsSettings = JSON.parse(savedSettings);
                 } else {
-                    // 如果 localStorage 中没有数据，初始化 eventsSettings
                     eventsSettings = {
                         hide_setting: {
                             ys: false,
@@ -192,7 +193,24 @@ function loadEvents(socket) {
                 legendContainer.innerHTML = "当前无事件";
             }
         })
-        .catch(error => console.error('Error loading events:', error));
+        .catch(error => {
+            console.error('加载事件出错:', error);
+            const legendContainer = document.querySelector('.legend-list');
+            legendContainer.innerHTML = `
+                <div class="error-message">
+                    <p>加载事件数据失败</p>
+                    <p>错误信息: ${error.message}</p>
+                    <button class="retry-btn">点击重试</button>
+                </div>
+            `;
+            const retryBtn = document.querySelector('.retry-btn');
+            retryBtn.addEventListener('click', () => {
+                legendContainer.innerHTML = "正在重新加载...";
+                setTimeout(() => {
+                    loadEvents(socket);
+                }, 500);
+            });
+        });
 }
 
 async function login(username, password) {
@@ -305,7 +323,7 @@ function connectWebSocket(token) {
         query: { token }
     });
     socket.on('connect', () => {
-        console.log('Connected to server');
+        // console.log('Connected to server');
         fetchLatestSettings(socket);
     });
     socket.on('user_connected', (data) => {
@@ -323,7 +341,7 @@ function connectWebSocket(token) {
         sortEvents();
     });
     socket.on('disconnect', () => {
-        console.log('Disconnected from server');
+        // console.log('Disconnected from server');
     });
     return socket;
 }
@@ -454,16 +472,6 @@ function createTimeline(events) {
                 const daysToWednesday = (3 - dayOfWeek + 7) % 7;
                 adjustedDate.setDate(startDate.getDate() + daysToWednesday);
                 adjustedDate.setHours(7, 0, 0, 0);
-                event.start = adjustedDate;
-            }
-        } else if (event.game === 'ww' && event.type === 'gacha') {
-            const startDate = event.start;
-            const dayOfWeek = startDate.getDay();
-            if (dayOfWeek !== 4) {
-                const adjustedDate = new Date(startDate);
-                const daysToThursday = (4 - dayOfWeek + 7) % 7;
-                adjustedDate.setDate(startDate.getDate() + daysToThursday);
-                adjustedDate.setHours(8, 0, 0, 0);
                 event.start = adjustedDate;
             }
         }
@@ -672,7 +680,7 @@ function showBannerWithInfo(event) {
     const isBlacklisted = window.walkthroughBlackWords.some(keyword =>
         displayName.includes(keyword)
     );
-    console.log(event.type, isBlacklisted);
+    // console.log(event.type, isBlacklisted);
     const isYsQuest = event.title.includes("时限内完成") && event.title.includes("任务");
     if (event.type === "event" && !isBlacklisted && !isYsQuest) {
         // displayName = displayName.replace('🎦', '').trim();
@@ -680,7 +688,7 @@ function showBannerWithInfo(event) {
         target="_blank" style="color: #00a3ff;text-decoration: none;" rel="noreferrer">
         【点击快速搜索攻略】
         </a>`;
-        console.log(eventNameElem.innerHTML)
+        // console.log(eventNameElem.innerHTML)
     }
     else if (event.type === "gacha" && event.name.includes('】')) {
         let name = event.name.split("】");

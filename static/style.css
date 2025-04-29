@@ -316,6 +316,12 @@ input:not([type=submit]):not([type=file]).red {
     padding: 6px;
 }
 
+.login-btn:hover,
+.login-button:hover,
+.logout-btn:hover {
+    background-color: #40a9ff;
+}
+
 .login-btn:disabled,
 .login-button:disabled,
 .logout-btn:disabled {
@@ -339,4 +345,29 @@ input:not([type=submit]):not([type=file]).red {
     border: 1px solid #ccc;
     background-color: #fff;
     cursor: pointer;
+}
+
+.error-message {
+    color: #ff4d4f;
+    padding: 10px;
+    text-align: center;
+}
+
+.error-message p {
+    margin: 5px 0;
+}
+
+.retry-btn {
+    background-color: #00a3ff;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-top: 10px;
+    transition: background-color 0.3s;
+}
+
+.retry-btn:hover {
+    background-color: #40a9ff;
 }

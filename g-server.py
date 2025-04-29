@@ -40,6 +40,14 @@ app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 socketio = SocketIO(app, cors_allowed_origins='*')
+req_headers = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
+    "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+    "Accept-Encoding": "gzip, deflate, br",
+    # "Referer": "https://example.com/",  # 替换为目标网站的域名
+    "Connection": "keep-alive",
+}
 
 
 def cache_control(cache_header):
@@ -261,7 +269,7 @@ def title_filter(game, title):
     elif game == "zzz":
         return "活动说明" in title and "全新放送" not in title and "『嗯呢』从天降" not in title and "特别访客" not in title
     elif game == "ww":
-        return title.endswith("活动") and "感恩答谢" not in title and "签到" not in title
+        return title.endswith("活动") and "感恩答谢" not in title and "签到" not in title and "回归" not in title and "数据回顾" not in title
     return False
 
 
@@ -420,16 +428,17 @@ def extract_zzz_gacha_start_end_time(html_content):
 
 def extract_ww_event_start_end_time(html_content):
     soup = BeautifulSoup(html_content, 'html.parser')
-    activity_time_header = soup.find(
-        'div', string=lambda text: text and '✦活动时间✦' in text)
-    if activity_time_header:
-        activity_time_div = activity_time_header.find_next_sibling('div')
-        if activity_time_div:
-            activity_time = activity_time_div.get_text(strip=True)
-            if "~" in activity_time:
-                return activity_time.split("~")[0].replace("（服务器时间）", "").strip(), activity_time.split("~")[1].replace("（服务器时间）", "").strip()
-            return activity_time
-    return ""
+    activity_time_divs = soup.find_all('div', attrs={'data-line': 'true'})
+    for div in activity_time_divs:
+        if div.find(string=lambda text: text and '✦活动时间✦' in text):
+            time_div = div.find_next('div', attrs={'data-line': 'true'})
+            if time_div:
+                activity_time = time_div.get_text(strip=True)
+                if "~" in activity_time:
+                    start_time = activity_time.split("~")[0].replace("（服务器时间）", "").strip()
+                    end_time = activity_time.split("~")[1].replace("（服务器时间）", "").strip()
+                    return start_time, end_time
+    return "", ""
 
 
 def update_event_fields(db_event, new_event_data):
@@ -487,12 +496,13 @@ def fetch_all_announcements(session):
 def fetch_game_announcements(session, game, list_url, content_url=None):
     version_now = "1.0"
     version_begin_time = "2024-11-01 00:00:01"
-    response = session.get(list_url, timeout=(5, 30))
+    response = session.get(list_url, timeout=(5, 30), headers=req_headers)
     response.raise_for_status()
     data = response.json()
 
     if game != "ww" and content_url:
-        ann_content_response = session.get(content_url, timeout=(5, 30))
+        ann_content_response = session.get(
+            content_url, timeout=(5, 30), headers=req_headers)
         ann_content_response.raise_for_status()
         ann_content_data = ann_content_response.json()
         content_map = {item['ann_id']: item for item in ann_content_data['data']['list']}
@@ -901,7 +911,7 @@ def process_ww_announcements(session, data, version_now, version_begin_time):
     for announcement in data["activity"]:
         clean_title = remove_html_tags(announcement["tabTitle"]["zh-Hans"])
         ann_content_response = session.get(
-            announcement['contentPrefix'][0] + "zh-Hans.json", timeout=(5, 20))
+            announcement['contentPrefix'][0] + "zh-Hans.json", timeout=(5, 20), headers=req_headers)
         ann_content_response.raise_for_status()
         ann_content_data = ann_content_response.json()
 
@@ -948,14 +958,36 @@ def process_ww_event(announcement, ann_content_data, version_now, version_begin_
 
 def process_ww_gacha(announcement, ann_content_data, version_now, version_begin_time):
     clean_title = remove_html_tags(announcement["tabTitle"]["zh-Hans"])
-    gacha_type = "共鸣者"
-    if "浮声" in clean_title:
+    gacha_type = "角色"
+    if "浮声" in clean_title or "武器" in clean_title:
         gacha_type = "武器"
+    if "周年" in clean_title:
+        text = ann_content_data["textContent"]
+        five_star_characters = [gacha_type]
 
-    announcement["title"] = (
-        f"【{ann_content_data['textTitle'].split('[')[1].split(']')[0]}】"
-        f"{gacha_type}唤取: {ann_content_data['textTitle'].split('「')[1].split('」')[0]}"
-    )
+        start_marker = f"5星{gacha_type}「"
+        end_marker = "」、"
+
+        start_index = text.find(start_marker)
+        if start_index != -1:
+            start_index += len(start_marker)
+            end_index = text.find(end_marker, start_index)
+            if end_index != -1:
+                characters_str = text[start_index:end_index]
+                five_star_characters = characters_str.split("」「")
+                announcement["title"] = (
+                    f"【周年活动・{ann_content_data['textTitle'].split("・")[1][:-1]}】"
+                    f"{gacha_type}唤取: {", ".join(five_star_characters)}"
+                )
+            else:
+                pass
+        else:
+            pass
+    else:
+        announcement["title"] = (
+            f"【{ann_content_data['textTitle'].split('[')[1].split(']')[0]}】"
+            f"{gacha_type}唤取: {ann_content_data['textTitle'].split('「')[1].split('」')[0]}"
+        )
     announcement["bannerImage"] = announcement.get(
         "tabBanner", {}).get("zh-Hans", "")[0]
     announcement["start_time"] = datetime.fromtimestamp(
@@ -1167,7 +1199,7 @@ def validate_geetest(validate):
     url = f"http://gcaptcha4.geetest.com/validate?captcha_id={captcha_id}"
 
     try:
-        res = requests.post(url, data=query)
+        res = requests.post(url, data=query, headers=req_headers)
         assert res.status_code == 200
         gt_msg = res.json()
     except Exception as e:
