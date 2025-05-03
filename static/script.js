@@ -16,8 +16,40 @@ window.walkthroughBlackWords = [
     "声弦涤荡",
     "区域系列活动",
 ];
+window.gameInfoMap = {
+    'ys': {
+        name: '原神',
+        urlScheme: 'hyp-cn://launchgame?gamebiz=hk4e_cn',
+        urlSchemeMobile: 'yuanshen://',
+        urlSchemeCloudMobile: 'yscloud://',
+        cloudUrl: 'https://ys.mihoyo.com/cloud'
+    },
+    'sr': {
+        name: '崩坏：星穹铁道',
+        urlScheme: 'hyp-cn://launchgame?gamebiz=hkrpg_cn',
+        urlSchemeMobile: 'starrailmihoyo://',
+        urlSchemeCloudMobile: 'srcloud://',
+        cloudUrl: 'https://sr.mihoyo.com/cloud'
+    },
+    'zzz': {
+        name: '绝区零',
+        urlScheme: 'hyp-cn://launchgame?gamebiz=nap_cn',
+        urlSchemeMobile: 'zenless://',
+        urlSchemeCloudMobile: 'zenlesscloud://',
+        cloudUrl: 'https://zzz.mihoyo.com/cloud-feat/'
+    },
+    'ww': {
+        name: '鸣潮',
+        urlScheme: `javascript:alert('PC端暂不支持，请手动启动游戏')`,
+        urlSchemeMobile: 'akicn://',
+        urlSchemeCloudMobile: 'akiyun://',
+        cloudUrl: 'https://mc.kurogames.com/cloud/'
+    }
+};
 
 document.addEventListener('DOMContentLoaded', () => {
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    window.isMobile = isMobile;
     const token = localStorage.getItem('token');
     if (token) {
         window.socket = connectWebSocket(token);
@@ -677,20 +709,39 @@ function showBannerWithInfo(event) {
     }
     bannerImage.src = event.bannerImage;
     let displayName = event.name;
+    const gameInfo = gameInfoMap[event.game];
+    let htmlContent = `<br>`;
+    // 根据设备类型选择URL scheme
+    const launchUrl = isMobile ? gameInfo.urlSchemeMobile : gameInfo.urlScheme;
+    const cloudLaunchUrl = isMobile ? gameInfo.urlSchemeCloudMobile : gameInfo.cloudUrl;
+    if (launchUrl) {
+        htmlContent += `<a href="${launchUrl}" style="color: #00a3ff;text-decoration: none;margin-right: 10px;" rel="noreferrer">
+            ▶️ 启动${gameInfo.name}
+        </a><br>`;
+    }
+    // 添加云游戏启动选项
+    htmlContent += `<a href="${cloudLaunchUrl}" style="color: #00a3ff;text-decoration: none;margin-right: 10px;" ${isMobile ? '' : 'target="_blank"'} rel="noreferrer">
+         ${isMobile ? '☁️启动云游戏' : '🌐 网页版云游戏'}
+    </a>`;
+    // 如果是移动端，额外添加网页版云游戏选项
+    if (isMobile) {
+        htmlContent += `<br><a href="${gameInfo.cloudUrl}" style="color: #00a3ff;text-decoration: none;margin-right: 10px;" target="_blank" rel="noreferrer">
+            🌐 网页版云游戏
+        </a>`;
+    }
     const isBlacklisted = window.walkthroughBlackWords.some(keyword =>
         displayName.includes(keyword)
     );
-    // console.log(event.type, isBlacklisted);
     const isYsQuest = event.title.includes("时限内完成") && event.title.includes("任务");
     if (event.type === "event" && !isBlacklisted && !isYsQuest) {
-        // displayName = displayName.replace('🎦', '').trim();
-        eventNameElem.innerHTML = `${displayName}<br><a href="https://search.bilibili.com/all?keyword=${encodeURIComponent(displayName)}" 
-        target="_blank" style="color: #00a3ff;text-decoration: none;" rel="noreferrer">
-        【点击快速搜索攻略】
-        </a>`;
-        // console.log(eventNameElem.innerHTML)
+        htmlContent += `<hr style="margin: 4px 0;">
+            <a href="https://search.bilibili.com/all?keyword=${encodeURIComponent(displayName)}" 
+            target="_blank" style="color: #00a3ff;text-decoration: none;" rel="noreferrer">
+            🔍 点击快速搜索攻略
+            </a>`;
     }
-    else if (event.type === "gacha" && event.name.includes('】')) {
+    eventNameElem.innerHTML = displayName + htmlContent;
+    if (event.type === "gacha" && event.name.includes('】')) {
         let name = event.name.split("】");
         let weapons = name[1].split(", ");
         let title = weapons[0].split(": ")[0];
@@ -703,14 +754,13 @@ function showBannerWithInfo(event) {
                 formattedHTML += `<br>${index + 1}. ${weapon}`;
             });
         }
-        eventNameElem.innerHTML = formattedHTML;
-    } else {
-        eventNameElem.textContent = `${event.name}`;
+        let gachaHTML = formattedHTML;
+        eventNameElem.innerHTML = gachaHTML + htmlContent;
     }
+
     eventStartDateElem.textContent = `📣 ${formatDateTime(event.start)}`;
     eventEndDateElem.textContent = `🛑 ${formatDateTime(event.end)}`;
 
-    // 更新右下角倒计时
     const updateRemainingTime = () => {
         const now = new Date();
         if (now < event.start) {
@@ -764,34 +814,130 @@ function showBannerWithInfo(event) {
     }, { once: true });
 }
 
+// 在createLegend函数中修改，添加按钮和面板逻辑
 function createLegend() {
     const legendContainer = document.querySelector('.legend-list');
     legendContainer.innerHTML = "";
-    const activityTypes = [
-        { type: 'ys', name: '原神' },
-        { type: 'sr', name: '崩坏：星穹铁道' },
-        { type: 'zzz', name: '绝区零' },
-        { type: 'ww', name: '鸣潮' }
-    ];
-    activityTypes.forEach(activity => {
+    const gameInfoArray = Object.entries(gameInfoMap).map(([type, info]) => ({
+        type,
+        name: info.name,
+        urlScheme: info.urlScheme,
+        urlSchemeMobile: info.urlSchemeMobile,
+        urlSchemeCloudMobile: info.urlSchemeCloudMobile,
+        cloudUrl: info.cloudUrl
+    }));
+    gameInfoArray.forEach(activity => {
         const legendItem = document.createElement('div');
         legendItem.classList.add('legend-item');
+
         const colorBox = document.createElement('span');
         colorBox.dataset.game = activity.type;
         colorBox.classList.add('color-box');
         colorBox.style.backgroundColor = getColor(activity.type);
-        // 添加点击事件监听器
         colorBox.addEventListener('click', () => toggleGameEventsVisibility(activity.type));
+
         const label = document.createElement('span');
         label.classList.add('label');
         label.textContent = activity.name;
+
+        // 添加▶️按钮
+        const actionBtn = document.createElement('span');
+        actionBtn.classList.add('game-action-btn');
+        actionBtn.innerHTML = '▶️';
+        actionBtn.dataset.game = activity.type;
+        actionBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            showGameActionPanel(activity);
+        });
+
         legendItem.appendChild(colorBox);
         legendItem.appendChild(label);
+        legendItem.appendChild(actionBtn);
         legendContainer.appendChild(legendItem);
     });
+
     const legendNote = document.createElement('div');
     legendNote.innerHTML = '<span style="width: 24px;display: inline-block;text-align: center;margin-right: 8px;">🎦</span>可快速搜索攻略';
     document.querySelector('.legend-list').appendChild(legendNote);
+}
+
+// 显示游戏操作面板
+function showGameActionPanel(gameInfo) {
+    // 移除现有的面板（如果有）
+    const existingPanel = document.querySelector('.game-action-panel');
+    if (existingPanel) {
+        existingPanel.remove();
+    }
+
+    const panel = document.createElement('div');
+    panel.classList.add('game-action-panel');
+
+    // 面板标题
+    const title = document.createElement('h3');
+    const colorBox = document.createElement('span');
+    colorBox.classList.add('game-color');
+    colorBox.style.backgroundColor = getColor(gameInfo.type);
+    title.appendChild(colorBox);
+    title.appendChild(document.createTextNode(gameInfo.name));
+    panel.appendChild(title);
+
+    const launchUrl = isMobile ? gameInfo.urlSchemeMobile : gameInfo.urlScheme;
+    if (launchUrl) {
+        const launchBtn = document.createElement('button');
+        launchBtn.textContent = '启动游戏';
+        launchBtn.addEventListener('click', () => {
+            window.location.href = launchUrl;
+        });
+        panel.appendChild(launchBtn);
+    }
+
+    // 云游戏按钮 - 根据设备类型显示不同文本
+    const cloudBtn = document.createElement('button');
+    cloudBtn.textContent = isMobile ? '启动云游戏' : '网页版云游戏';
+    cloudBtn.classList.add(isMobile ? 'cloud-btn' : 'web-cloud-btn');
+
+    // 根据设备类型使用不同的URL
+    const cloudUrl = isMobile ? gameInfo.urlSchemeCloudMobile : gameInfo.cloudUrl;
+    // console.log(cloudUrl, gameInfo)
+    cloudBtn.addEventListener('click', () => {
+        if (isMobile) {
+            window.location.href = cloudUrl;
+        } else {
+            window.open(cloudUrl, '_blank');
+        }
+    });
+    panel.appendChild(cloudBtn);
+
+    // 如果是移动端，额外添加网页版云游戏按钮
+    if (isMobile) {
+        const webCloudBtn = document.createElement('button');
+        webCloudBtn.textContent = '网页版云游戏';
+        webCloudBtn.classList.add('web-cloud-btn');
+        webCloudBtn.addEventListener('click', () => {
+            window.open(gameInfo.cloudUrl, '_blank');
+        });
+        panel.appendChild(webCloudBtn);
+    }
+
+    // 返回按钮
+    const backBtn = document.createElement('button');
+    backBtn.textContent = '返回';
+    backBtn.classList.add('back-btn');
+    backBtn.addEventListener('click', () => {
+        panel.remove();
+    });
+    panel.appendChild(backBtn);
+
+    // 添加到页面
+    document.querySelector('.legend-container').appendChild(panel);
+
+    // 点击外部关闭面板
+    document.addEventListener('click', function closePanel(e) {
+        if (!panel.contains(e.target) && !e.target.classList.contains('game-action-btn')) {
+            panel.remove();
+            document.removeEventListener('click', closePanel);
+        }
+    });
 }
 
 function toggleGameEventsVisibility(gameType) {

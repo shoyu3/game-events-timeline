@@ -377,14 +377,25 @@ def extract_zzz_event_start_end_time(html_content):
     soup = BeautifulSoup(html_content, 'html.parser')
     activity_time_label = soup.find(
         'p', string=lambda text: text and '【活动时间】' in text)
+    
     if activity_time_label:
         activity_time_p = activity_time_label.find_next('p')
         if activity_time_p:
             activity_time_text = activity_time_p.get_text(strip=True)
-            if "~" in activity_time_text:
-                return activity_time_text.split("~")[0].replace("（服务器时间）", "").strip(), activity_time_text.split("~")[1].replace("（服务器时间）", "").strip()
-            return activity_time_text
-    return ""
+            # 处理分隔符（支持 - 或 ~）
+            if "-" in activity_time_text:
+                start, end = activity_time_text.split("-", 1)
+            elif "~" in activity_time_text:
+                start, end = activity_time_text.split("~", 1)
+            else:
+                return activity_time_text, ""  # 返回默认值
+            
+            # 清理时间字符串
+            start = start.replace("（服务器时间）", "").strip()
+            end = end.replace("（服务器时间）", "").strip()
+            return start, end
+    
+    return "", ""
 
 
 def extract_zzz_gacha_start_end_time(html_content):
@@ -435,8 +446,10 @@ def extract_ww_event_start_end_time(html_content):
             if time_div:
                 activity_time = time_div.get_text(strip=True)
                 if "~" in activity_time:
-                    start_time = activity_time.split("~")[0].replace("（服务器时间）", "").strip()
-                    end_time = activity_time.split("~")[1].replace("（服务器时间）", "").strip()
+                    start_time = activity_time.split(
+                        "~")[0].replace("（服务器时间）", "").strip()
+                    end_time = activity_time.split(
+                        "~")[1].replace("（服务器时间）", "").strip()
                     return start_time, end_time
     return "", ""
 
@@ -505,7 +518,7 @@ def fetch_game_announcements(session, game, list_url, content_url=None):
             content_url, timeout=(5, 30), headers=req_headers)
         ann_content_response.raise_for_status()
         ann_content_data = ann_content_response.json()
-        content_map = {item['ann_id']: item for item in ann_content_data['data']['list']}
+        content_map = {item['ann_id']                       : item for item in ann_content_data['data']['list']}
         pic_content_map = {
             item['ann_id']: item for item in ann_content_data['data']['pic_list']}
     else:
@@ -781,11 +794,10 @@ def process_zzz_announcements(data, content_map, version_now, version_begin_time
 
     # Process event and gacha announcements
     for item in data["data"]["list"]:
-        if item["type_id"] == 4:
+        if item["type_id"] in [3, 4]:
             for announcement in item["list"]:
                 ann_content = content_map[announcement['ann_id']]
                 clean_title = remove_html_tags(announcement["title"])
-
                 if title_filter("zzz", clean_title) and "累计登录7天" not in ann_content['content']:
                     process_zzz_event(announcement, ann_content,
                                       version_now, version_begin_time)

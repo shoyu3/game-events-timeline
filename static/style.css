@@ -161,6 +161,8 @@ input:not([type=submit]):not([type=file]).red {
     padding: 10px;
     border-radius: 8px;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
 }
 
 .login-container {
@@ -229,6 +231,8 @@ input:not([type=submit]):not([type=file]).red {
     display: flex;
     align-items: center;
     justify-content: center;
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
 }
 
 .banner-img {
@@ -254,6 +258,7 @@ input:not([type=submit]):not([type=file]).red {
     text-align: center;
     padding: 0;
     transition: all .3s;
+    backdrop-filter: blur(10px);
 }
 
 .close-btn:hover {
@@ -370,4 +375,91 @@ input:not([type=submit]):not([type=file]).red {
 
 .retry-btn:hover {
     background-color: #40a9ff;
+}
+
+.game-action-btn {
+    margin-left: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.game-action-btn:hover {
+    opacity: 1;
+}
+
+.game-action-panel {
+    position: absolute;
+    top: 8px;
+    left: 10px;
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 8px;
+    padding: 15px;
+    width: 120px;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    color: black;
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+}
+
+.game-action-panel h3 {
+    margin: 0 0 10px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: normal;
+}
+
+.game-action-panel .game-color {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+}
+
+.game-action-panel button {
+    display: block;
+    width: 100%;
+    padding: 8px;
+    margin: 5px 0;
+    border: none;
+    border-radius: 4px;
+    background: #4CAF50;
+    color: white;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.game-action-panel button:hover {
+    background: #45a049;
+}
+
+.game-action-panel .web-cloud-btn {
+    background: #2196F3;
+}
+
+.game-action-panel .web-cloud-btn:hover {
+    background: #0b7dda;
+}
+
+.game-action-panel .cloud-btn {
+    background: #cf75df;
+}
+
+.game-action-panel .cloud-btn:hover {
+    background: #aa5bcc;
+}
+
+.game-action-panel .back-btn {
+    margin-top: 10px;
+    background: transparent;
+    border: 1px solid #666;
+    color: #000;
+}
+
+.game-action-panel .back-btn:hover {
+    background: #aaa;
 }
