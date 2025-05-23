@@ -228,7 +228,7 @@ def remove_html_tags(text):
 
 
 def extract_floats(text):
-    float_pattern = r'-?\d+\.\d+'
+    float_pattern = r'\d+\.\d+'
     floats = re.findall(float_pattern, text)
     return [float(f) for f in floats]
 
@@ -264,11 +264,11 @@ def title_filter(game, title):
         return True
     if game == "ys":
         return "时限内" in title or (all(keyword not in title for keyword in ["魔神任务", "礼包", "纪行", "铸境研炼", "七圣召唤", "限时折扣"]))
-    elif game == "sr":
+    if game == "sr":
         return "等奖励" in title and "模拟宇宙" not in title
-    elif game == "zzz":
+    if game == "zzz":
         return "活动说明" in title and "全新放送" not in title and "『嗯呢』从天降" not in title and "特别访客" not in title and "惊喜派送中" not in title
-    elif game == "ww":
+    if game == "ww":
         return title.endswith("活动") and "感恩答谢" not in title and "签到" not in title and "回归" not in title and "数据回顾" not in title
     return False
 
@@ -552,7 +552,8 @@ def fetch_game_announcements(session, game, list_url, content_url=None):
             content_url, timeout=(5, 30), headers=req_headers)
         ann_content_response.raise_for_status()
         ann_content_data = ann_content_response.json()
-        content_map = {item['ann_id']: item for item in ann_content_data['data']['list']}
+        content_map = {item['ann_id']
+            : item for item in ann_content_data['data']['list']}
         pic_content_map = {
             item['ann_id']: item for item in ann_content_data['data']['pic_list']}
     else:
@@ -1539,8 +1540,9 @@ def show_404_page(e):
 
 def load_geetest_config():
     geetest_config_path = os.path.join(base_dir, 'geetest.json')
+    empty_value = {"captchaId": "", "captchaKey": ""}
     if not os.path.exists(geetest_config_path):
-        return None
+        return empty_value
 
     try:
         with open(geetest_config_path, 'r', encoding='utf-8') as f:
@@ -1549,11 +1551,12 @@ def load_geetest_config():
             if not config.get('captchaId') or not config.get('captchaKey'):
                 print(
                     "Warning: geetest.json is missing required fields (captchaId or captchaKey). Captcha will be disabled.")
-                return None
+                return empty_value
             return config
     except json.JSONDecodeError:
         print("Warning: geetest.json is invalid. Captcha will be disabled.")
-        return None
+        return empty_value
+        # return None
 
 
 geetest_config = load_geetest_config()

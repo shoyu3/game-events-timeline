@@ -166,16 +166,42 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     if (isMobile) {
+        const usernameInput = document.querySelector("input[name=username]");
+        const passwordInput = document.querySelector("input[name=password]");
+        const legendContainer = document.querySelector('.legend-container');
         let initialHeight = window.innerHeight;
-        window.visualViewport.addEventListener('resize', function() {
+        let isInputFocused = false;
+
+        // 1. 首先记录初始页面高度
+        function updateInitialHeight() {
+            initialHeight = window.innerHeight;
+        }
+
+        // 页面加载完成后记录初始高度
+        setTimeout(updateInitialHeight, 500);
+
+        // 2. 检测输入框焦点状态
+        [usernameInput, passwordInput].forEach(input => {
+            input.addEventListener('focus', () => {
+                isInputFocused = true;
+                // 不立即隐藏，等待高度检测确认
+            });
+
+            input.addEventListener('blur', () => {
+                isInputFocused = false;
+                // legendContainer.style.display = '';
+            });
+        });
+
+        window.visualViewport.addEventListener('resize', function () {
             const legendContainer = document.querySelector('.legend-container');
             // alert(`${window.visualViewport.height} ${initialHeight}`)
-            if (window.visualViewport.height < initialHeight) {
+            if (window.visualViewport.height < initialHeight && isInputFocused) {
                 legendContainer.style.display = 'none';
             } else {
                 legendContainer.style.display = '';
             }
-        });    
+        });
     }
 });
 
@@ -284,7 +310,7 @@ function loadEvents(socket) {
 
 async function login(username, password) {
     window.userinfo = { username, password };
-    if (window.captchaObj && typeof captchaObj.showCaptcha === 'function') {
+    if (window.captchaObj && typeof captchaObj.showCaptcha === 'function' && captchaId) {
         captchaObj.showCaptcha();
     } else {
         console.warn("Geetest not available, proceeding without captcha.");
