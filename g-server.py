@@ -44,9 +44,9 @@ req_headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
     "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
-    "Accept-Encoding": "gzip, deflate, br",
-    # "Referer": "https://example.com/",  # 替换为目标网站的域名
+    "Accept-Encoding": "gzip, deflate",
     "Connection": "keep-alive",
+    'Content-Type': 'application/x-www-form-urlencoded'
 }
 
 
@@ -267,7 +267,7 @@ def title_filter(game, title):
     elif game == "sr":
         return "等奖励" in title and "模拟宇宙" not in title
     elif game == "zzz":
-        return "活动说明" in title and "全新放送" not in title and "『嗯呢』从天降" not in title and "特别访客" not in title
+        return "活动说明" in title and "全新放送" not in title and "『嗯呢』从天降" not in title and "特别访客" not in title and "惊喜派送中" not in title
     elif game == "ww":
         return title.endswith("活动") and "感恩答谢" not in title and "签到" not in title and "回归" not in title and "数据回顾" not in title
     return False
@@ -315,6 +315,28 @@ def extract_ys_event_start_time(html_content):
                 text = re.sub("<[^>]+>", "", time_range.split("~")[0].strip())
                 return text
             return re.sub("<[^>]+>", "", time_range)
+    return ""
+
+
+def extract_ys_gacha_start_time_2(html_content):
+    soup = BeautifulSoup(html_content, 'html.parser')
+
+    # 尝试查找包含时间的td元素
+    time_td = soup.find('td', {'rowspan': lambda x: x and int(x) >= 3})
+    if not time_td:
+        return ""
+
+    # 提取第一个t_lc标签内容
+    time_tag = time_td.find('t', {'class': 't_lc'})
+    if time_tag:
+        return time_tag.text
+
+    # 如果没有t_lc标签，尝试直接提取第一个时间格式
+    time_text = time_td.get_text()
+    time_match = re.search(r'\d{4}/\d{2}/\d{2} \d{2}:\d{2}', time_text)
+    if time_match:
+        return time_match.group()
+
     return ""
 
 
@@ -375,13 +397,25 @@ def extract_sr_gacha_start_time(html_content):
 
 def extract_zzz_event_start_end_time(html_content):
     soup = BeautifulSoup(html_content, 'html.parser')
+
+    # 尝试第一种情况：【活动时间】在p标签的直接文本中
     activity_time_label = soup.find(
         'p', string=lambda text: text and '【活动时间】' in text)
-    
+
+    # 如果第一种情况没找到，尝试第二种情况：【活动时间】在span标签中
+    if not activity_time_label:
+        activity_time_span = soup.find(
+            'span', string=lambda text: text and '【活动时间】' in text)
+        if activity_time_span:
+            activity_time_label = activity_time_span.find_parent('p')
+
     if activity_time_label:
+        # 查找下一个p标签（可能是兄弟节点或下一个节点）
         activity_time_p = activity_time_label.find_next('p')
+
         if activity_time_p:
             activity_time_text = activity_time_p.get_text(strip=True)
+
             # 处理分隔符（支持 - 或 ~）
             if "-" in activity_time_text:
                 start, end = activity_time_text.split("-", 1)
@@ -389,12 +423,12 @@ def extract_zzz_event_start_end_time(html_content):
                 start, end = activity_time_text.split("~", 1)
             else:
                 return activity_time_text, ""  # 返回默认值
-            
+
             # 清理时间字符串
             start = start.replace("（服务器时间）", "").strip()
             end = end.replace("（服务器时间）", "").strip()
             return start, end
-    
+
     return "", ""
 
 
@@ -518,7 +552,7 @@ def fetch_game_announcements(session, game, list_url, content_url=None):
             content_url, timeout=(5, 30), headers=req_headers)
         ann_content_response.raise_for_status()
         ann_content_data = ann_content_response.json()
-        content_map = {item['ann_id']                       : item for item in ann_content_data['data']['list']}
+        content_map = {item['ann_id']: item for item in ann_content_data['data']['list']}
         pic_content_map = {
             item['ann_id']: item for item in ann_content_data['data']['pic_list']}
     else:
@@ -535,7 +569,7 @@ def fetch_game_announcements(session, game, list_url, content_url=None):
             data, content_map, pic_content_map, version_now, version_begin_time)
     elif game == "zzz":
         filtered_list = process_zzz_announcements(
-            data, content_map, version_now, version_begin_time)
+            data, content_map, pic_content_map, version_now, version_begin_time)
     elif game == "ww":
         filtered_list = process_ww_announcements(
             session, data, version_now, version_begin_time)
@@ -622,8 +656,12 @@ def process_ys_gacha(announcement, ann_content, version_now, version_begin_time)
     announcement["bannerImage"] = ann_content.get("banner", "")
     announcement["event_type"] = "gacha"
 
-    ann_content_start_time = extract_ys_gacha_start_time(
-        ann_content['content'])
+    if "集录" in clean_title:
+        ann_content_start_time = extract_ys_gacha_start_time_2(
+            ann_content['content'])
+    else:
+        ann_content_start_time = extract_ys_gacha_start_time(
+            ann_content['content'])
     if f"{version_now}版本" in ann_content_start_time:
         announcement["start_time"] = version_begin_time
     else:
@@ -774,7 +812,7 @@ def process_sr_gacha(announcement, ann_content, version_now, version_begin_time)
             pass
 
 
-def process_zzz_announcements(data, content_map, version_now, version_begin_time):
+def process_zzz_announcements(data, content_map, pic_content_map, version_now, version_begin_time):
     filtered_list = []
 
     # Process version announcements
@@ -782,7 +820,6 @@ def process_zzz_announcements(data, content_map, version_now, version_begin_time
         if item["type_label"] == "游戏公告":
             for announcement in item["list"]:
                 clean_title = remove_html_tags(announcement["title"])
-                # print(clean_title)
                 if "更新说明" in clean_title and "版本" in clean_title:
                     version_now = str(extract_floats(clean_title)[0])
                     announcement["title"] = "绝区零 " + version_now + " 版本"
@@ -792,7 +829,7 @@ def process_zzz_announcements(data, content_map, version_now, version_begin_time
                     version_begin_time = announcement["start_time"]
                     filtered_list.append(announcement)
 
-    # Process event and gacha announcements
+    # Process event and gacha announcements from list
     for item in data["data"]["list"]:
         if item["type_id"] in [3, 4]:
             for announcement in item["list"]:
@@ -807,16 +844,83 @@ def process_zzz_announcements(data, content_map, version_now, version_begin_time
                                       version_now, version_begin_time)
                     filtered_list.append(announcement)
 
+    # Process event and gacha announcements from pic_list
+    for item in data["data"]["pic_list"]:
+        for type_item in item["type_list"]:
+            for announcement in type_item["list"]:
+                ann_content = pic_content_map[announcement['ann_id']]
+                clean_title = remove_html_tags(announcement["title"])
+                if title_filter("zzz", clean_title):
+                    process_zzz_pic_event(
+                        announcement, ann_content, version_now, version_begin_time)
+                    filtered_list.append(announcement)
+                elif "限时频段" in clean_title:
+                    process_zzz_pic_gacha(
+                        announcement, ann_content, version_now, version_begin_time)
+                    filtered_list.append(announcement)
+
     return filtered_list
 
 
-def process_zzz_event(announcement, ann_content, version_now, version_begin_time):
+def process_zzz_pic_event(announcement, ann_content, version_now, version_begin_time):
     clean_title = remove_html_tags(announcement["title"])
     announcement["title"] = clean_title
-    announcement["bannerImage"] = announcement.get("banner", "")
+    announcement["bannerImage"] = announcement.get("img", "")
     announcement["event_type"] = "event"
 
     ann_content_start_time, ann_content_end_time = extract_zzz_event_start_end_time(
+        ann_content['content'])
+    if f"{version_now}版本" in ann_content_start_time:
+        announcement["start_time"] = version_begin_time
+        try:
+            date_obj = datetime.strptime(extract_clean_time(
+                ann_content_end_time), "%Y/%m/%d %H:%M").replace(second=0)
+            formatted_date = date_obj.strftime("%Y-%m-%d %H:%M:%S")
+            announcement["end_time"] = formatted_date
+        except Exception as e:
+            print(repr(e))
+    else:
+        try:
+            date_obj = datetime.strptime(extract_clean_time(
+                ann_content_start_time), "%Y/%m/%d %H:%M").replace(second=0)
+            formatted_date = date_obj.strftime("%Y-%m-%d %H:%M:%S")
+            announcement["start_time"] = formatted_date
+            date_obj = datetime.strptime(extract_clean_time(
+                ann_content_end_time), "%Y/%m/%d %H:%M").replace(second=0)
+            formatted_date = date_obj.strftime("%Y-%m-%d %H:%M:%S")
+            announcement["end_time"] = formatted_date
+        except Exception as e:
+            print(repr(e))
+
+
+def process_zzz_pic_gacha(announcement, ann_content, version_now, version_begin_time):
+    clean_title = remove_html_tags(announcement["title"])
+
+    # 提取所有调频活动名称（如「飞鸟坠入良夜」「『查无此人』」）
+    gacha_names = re.findall(r'「([^」]+)」调频说明', ann_content['content'])
+
+    # 提取所有S级代理人和音擎名称
+    s_agents = re.findall(
+        r"限定S级代理人.*?\[(.*?)\(.*?\)\]", ann_content['content'])
+    s_weapons = re.findall(
+        r"限定S级音擎.*?\[(.*?)\(.*?\)\]", ann_content['content'])
+
+    # 合并所有名称
+    all_names = list(dict.fromkeys(s_agents + s_weapons))
+    w_engine_gacha_name = ["喧哗奏鸣", "激荡谐振", "灿烂和声", "璀璨韵律"]
+    gacha_names = [x for x in gacha_names if x not in w_engine_gacha_name]
+
+    # 生成新的标题格式
+    if gacha_names and all_names:
+        clean_title = f"【{', '.join(gacha_names)}】代理人、音擎调频: {', '.join(all_names)}"
+    else:
+        clean_title = clean_title  # 如果提取失败，保持原样
+
+    announcement["title"] = clean_title
+    announcement["event_type"] = "gacha"
+    announcement["bannerImage"] = announcement.get("img", "")
+
+    ann_content_start_time, ann_content_end_time = extract_zzz_gacha_start_end_time(
         ann_content['content'])
     if f"{version_now}版本" in ann_content_start_time:
         announcement["start_time"] = version_begin_time
@@ -839,6 +943,39 @@ def process_zzz_event(announcement, ann_content, version_now, version_begin_time
             announcement["end_time"] = formatted_date
         except Exception:
             pass
+
+
+def process_zzz_event(announcement, ann_content, version_now, version_begin_time):
+    clean_title = remove_html_tags(announcement["title"])
+    announcement["title"] = clean_title
+    announcement["bannerImage"] = announcement.get("banner", "")
+    announcement["event_type"] = "event"
+
+    ann_content_start_time, ann_content_end_time = extract_zzz_event_start_end_time(
+        ann_content['content'])
+    # print(clean_title)
+    # print(ann_content_start_time,ann_content_end_time)
+    if f"{version_now}版本" in ann_content_start_time:
+        announcement["start_time"] = version_begin_time
+        try:
+            date_obj = datetime.strptime(extract_clean_time(
+                ann_content_end_time), "%Y/%m/%d %H:%M").replace(second=0)
+            formatted_date = date_obj.strftime("%Y-%m-%d %H:%M:%S")
+            announcement["end_time"] = formatted_date
+        except Exception as e:
+            print(repr(e))
+    else:
+        try:
+            date_obj = datetime.strptime(extract_clean_time(
+                ann_content_start_time), "%Y/%m/%d %H:%M").replace(second=0)
+            formatted_date = date_obj.strftime("%Y-%m-%d %H:%M:%S")
+            announcement["start_time"] = formatted_date
+            date_obj = datetime.strptime(extract_clean_time(
+                ann_content_end_time), "%Y/%m/%d %H:%M").replace(second=0)
+            formatted_date = date_obj.strftime("%Y-%m-%d %H:%M:%S")
+            announcement["end_time"] = formatted_date
+        except Exception as e:
+            print(repr(e))
 
 
 def process_zzz_gacha(announcement, ann_content, version_now, version_begin_time):
@@ -1424,7 +1561,8 @@ app.config['GEETEST_CONFIG'] = geetest_config
 
 scheduler = BackgroundScheduler()
 scheduler.add_job(scheduled_task, 'cron', hour=9, minute=0)
-scheduler.add_job(scheduled_task, 'cron', hour=12, minute=30)
+scheduler.add_job(scheduled_task, 'cron', hour=11, minute=10)
+scheduler.add_job(scheduled_task, 'cron', hour=16, minute=0)
 scheduler.add_job(scheduled_task, 'cron', hour=18, minute=0)
 scheduler.add_job(scheduled_task, 'cron', hour=22, minute=0)
 scheduler.start()

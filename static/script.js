@@ -1,6 +1,7 @@
 "use strict";
 
 window.remainingTimeInterval = null;
+window.dateCountdownInterval = null;
 window.totalDays = 0;
 window.pxPerDay = 36;
 window.initialEvents = [];
@@ -48,6 +49,12 @@ window.gameInfoMap = {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
+    // 添加使用指南点击事件
+    const guideLink = document.querySelector('.guide-link');
+    guideLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        showGuideModal();
+    });
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     window.isMobile = isMobile;
     const token = localStorage.getItem('token');
@@ -141,6 +148,35 @@ document.addEventListener('DOMContentLoaded', () => {
         isDragging = false;
         timelineContainer.style.cursor = 'grab';
     });
+
+    // 添加日期标签点击事件
+    document.addEventListener('click', function (e) {
+        if (e.target.classList.contains('date-label') ||
+            e.target.closest('.date-label')) {
+            const dateLabel = e.target.classList.contains('date-label') ?
+                e.target : e.target.closest('.date-label');
+            const dateStr = dateLabel.dataset.date;
+            showDateEvents(dateStr);
+        }
+    });
+
+    // 添加日期信息弹窗关闭按钮事件
+    document.querySelector('.date-info-close-btn').addEventListener('click', function () {
+        document.querySelector('.date-info-container').style.display = 'none';
+    });
+
+    if (isMobile) {
+        let initialHeight = window.innerHeight;
+        window.visualViewport.addEventListener('resize', function() {
+            const legendContainer = document.querySelector('.legend-container');
+            // alert(`${window.visualViewport.height} ${initialHeight}`)
+            if (window.visualViewport.height < initialHeight) {
+                legendContainer.style.display = 'none';
+            } else {
+                legendContainer.style.display = '';
+            }
+        });    
+    }
 });
 
 let eventsSettings = {
@@ -218,6 +254,7 @@ function loadEvents(socket) {
                 loadHiddenStatus();
                 loadCompletionStatus();
                 const sortSelect = document.querySelector("#sort-select");
+                sortSelect.disabled = false;
                 sortSelect.value = eventsSettings.sortOrder;
                 sortEvents();
             } else {
@@ -447,7 +484,6 @@ function createTimeline(events) {
         currentDate.setDate(currentDate.getDate() + i);
         const label = document.createElement('div');
         label.classList.add('date-label');
-        label.style.left = i * pxPerDay + "px";
         if (isToday(currentDate)) {
             label.classList.add('today');
         }
@@ -472,8 +508,10 @@ function createTimeline(events) {
             if (currentDate.Format("d") === "1") {
                 line.style.width = "3px";
                 line.style.backgroundColor = "#ccc";
+                label.style.left = i * pxPerDay + "px";
             }
         } else {
+            label.style.left = i * pxPerDay - 10 + "px";
             line.style.marginLeft = i * pxPerDay - 10 + "px";
             label.innerHTML = `<div class="month-day today-date">${currentDate.Format("d")}</div><div class="week-day">${formatWeekDay(currentDate)}</idv>`;
         }
@@ -514,6 +552,8 @@ function createTimeline(events) {
         eventElement.style.top = `${index * 30 + index * 8}px`;
         const eventTitleDiv = document.createElement('div');
         eventTitleDiv.classList.add('event-title');
+        const eventTitleContent = document.createElement('div');
+        eventTitleContent.classList.add('event-title-content');
         const timeRemainingSpan = document.createElement('div');
         timeRemainingSpan.classList.add('time-remaining');
         eventElement.appendChild(timeRemainingSpan);
@@ -534,22 +574,25 @@ function createTimeline(events) {
         } else {
             eventTitle.textContent = event.name;
         }
-        eventTitleDiv.appendChild(eventTitle);
+        eventTitleContent.appendChild(eventTitle);
+        eventTitleDiv.appendChild(eventTitleContent);
         updateEventCountdown();
         // 添加倒计时逻辑
         function updateEventCountdown() {
             const now = new Date();
             const startTime = new Date(event.start);
             const endTime = new Date(event.end);
+            const oneDayInMs = 1000 * 60 * 60 * 24;
+
             if (now < startTime) {
                 // 活动未开始，显示开始倒计时
                 const timeRemaining = startTime.getTime() - now.getTime();
                 const days = Math.floor(timeRemaining / (1000 * 60 * 60 * 24));
                 const hours = Math.floor((timeRemaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
                 const minutes = Math.floor((timeRemaining % (1000 * 60 * 60)) / (1000 * 60));
-                const seconds = Math.floor((timeRemaining % (1000 * 60)) / 1000);
                 timeRemainingSpan.textContent = `即将开始 ${days}天 ${hours}小时`;
-                // timeRemainingSpan.style.color = 'orange';
+                timeRemainingSpan.style.backgroundColor = '';
+                timeRemainingSpan.style.padding = '';
                 const timeRemainingWidth = timeRemainingSpan.offsetWidth;
                 timeRemainingSpan.style.right = 'auto';
                 timeRemainingSpan.style.left = `-${(timeRemainingWidth === 0 ? 90 : timeRemainingWidth) + 10}px`;
@@ -558,8 +601,19 @@ function createTimeline(events) {
                 const timeRemaining = endTime.getTime() - now.getTime();
                 const days = Math.floor(timeRemaining / (1000 * 60 * 60 * 24));
                 const hours = Math.floor((timeRemaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                // 设置倒计时文本
                 timeRemainingSpan.textContent = `${days}天 ${hours}小时`;
-                // timeRemainingSpan.style.color = 'green';
+                // 根据剩余时间设置背景色
+                if (timeRemaining <= oneDayInMs + oneDayInMs / 2) {
+                    timeRemainingSpan.style.backgroundColor = 'red';
+                    timeRemainingSpan.style.padding = '2px 4px';
+                } else if (timeRemaining <= 3 * oneDayInMs + oneDayInMs / 2) {
+                    timeRemainingSpan.style.backgroundColor = '#FF5000';
+                    timeRemainingSpan.style.padding = '2px 4px';
+                } else {
+                    timeRemainingSpan.style.backgroundColor = '';
+                    timeRemainingSpan.style.padding = '';
+                }
                 const timeRemainingWidth = timeRemainingSpan.offsetWidth;
                 timeRemainingSpan.style.left = 'auto';
                 timeRemainingSpan.style.right = `-${(timeRemainingWidth === 0 ? 90 : timeRemainingWidth) + 10}px`;
@@ -569,12 +623,12 @@ function createTimeline(events) {
                 const days = Math.floor(timePassed / (1000 * 60 * 60 * 24));
                 const hours = Math.floor((timePassed % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
                 timeRemainingSpan.textContent = `已结束 ${days}天 ${hours}小时`;
-                // timeRemainingSpan.style.color = 'red';
+                timeRemainingSpan.style.backgroundColor = '';
+                timeRemainingSpan.style.padding = '';
                 const timeRemainingWidth = timeRemainingSpan.offsetWidth;
                 timeRemainingSpan.style.left = 'auto';
                 timeRemainingSpan.style.right = `-${(timeRemainingWidth === 0 ? 90 : timeRemainingWidth) + 10}px`;
             }
-
         }
         // 初始化倒计时
         updateEventCountdown();
@@ -595,11 +649,11 @@ function createTimeline(events) {
         const now = new Date();
         const timeRemainingInMs = event.end.getTime() - now.getTime();
         const oneDayInMs = 1000 * 60 * 60 * 24;
-        if (timeRemainingInMs <= oneDayInMs + oneDayInMs / 2) {
-            eventElement.style.backgroundImage = `linear-gradient(to right, ${event.color} calc(100% - 252px), red 100%)`;
-        } else if (timeRemainingInMs <= 3 * oneDayInMs + oneDayInMs / 2) {
-            eventElement.style.backgroundImage = `linear-gradient(to right, ${event.color} calc(100% - 252px), #FF5000 100%)`;
-        }
+        // if (timeRemainingInMs <= oneDayInMs + oneDayInMs / 2) {
+        //     eventElement.style.backgroundImage = `linear-gradient(to right, ${event.color} calc(100% - 252px), red 100%)`;
+        // } else if (timeRemainingInMs <= 3 * oneDayInMs + oneDayInMs / 2) {
+        //     eventElement.style.backgroundImage = `linear-gradient(to right, ${event.color} calc(100% - 252px), #FF5000 100%)`;
+        // }
         eventElement.appendChild(eventTitleDiv);
         // 创建并添加带有 bannerImage 的 div
         const bannerDiv = document.createElement('div');
@@ -611,7 +665,7 @@ function createTimeline(events) {
             } else if (event.game === "sr") {
                 bannerDiv.style.backgroundPosition = 'center 25px';
             } else if (event.game === "zzz") {
-                bannerDiv.style.backgroundPosition = 'center 34px';
+                bannerDiv.style.backgroundPosition = 'center 52px';
             } else {
                 if (!event.name.includes("武器")) {
                     bannerDiv.style.backgroundPosition = 'center 25%';
@@ -888,6 +942,7 @@ function showGameActionPanel(gameInfo) {
         launchBtn.addEventListener('click', () => {
             window.location.href = launchUrl;
         });
+        launchBtn.classList.add('launch-btn');
         panel.appendChild(launchBtn);
     }
 
@@ -937,6 +992,198 @@ function showGameActionPanel(gameInfo) {
             panel.remove();
             document.removeEventListener('click', closePanel);
         }
+    });
+}
+
+// 显示指定日期的活动信息
+function showDateEvents(dateStr) {
+    const date = new Date(dateStr);
+    const dateContainer = document.querySelector('.date-info-container');
+    const dateTitle = document.querySelector('.date-info-title');
+    const dateCountdown = document.querySelector('.date-info-countdown');
+    const eventsList = document.querySelector('.date-events-list');
+
+    // 清除旧的定时器
+    if (window.dateCountdownInterval) {
+        clearInterval(window.dateCountdownInterval);
+    }
+
+    // 设置日期标题
+    dateTitle.textContent = `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
+
+    // 计算距离今天的时间
+    const updateCountdown = () => {
+        const now = new Date();
+        const targetDate = new Date(date);
+        targetDate.setHours(0, 0, 0, 0);
+        const today = new Date(now);
+        today.setHours(0, 0, 0, 0);
+
+        const diffMs = targetDate - today;
+        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        const absDiffDays = Math.abs(diffDays);
+
+        if (diffDays === 0) {
+            dateCountdown.textContent = '今天';
+        } else if (diffDays > 0) {
+            dateCountdown.textContent = `${absDiffDays}天后`;
+        } else {
+            dateCountdown.textContent = `${absDiffDays}天前`;
+        }
+    };
+
+    updateCountdown();
+
+    // 查找当天的活动
+    eventsList.innerHTML = '';
+    const allEvents = Array.from(document.querySelectorAll('.event'));
+
+    // 过滤掉被隐藏的游戏类型
+    const dateEvents = allEvents.filter(event => {
+        const eventStart = new Date(parseInt(event.dataset.start));
+        const eventEnd = new Date(parseInt(event.dataset.end));
+        eventStart.setHours(0, 0, 0, 0);
+        eventEnd.setHours(0, 0, 0, 0);
+        date.setHours(0, 0, 0, 0);
+
+        // 检查游戏类型是否被隐藏
+        const gameType = event.dataset.game;
+        const isHidden = eventsSettings.hide_setting[gameType];
+
+        return !isHidden && date >= eventStart && date <= eventEnd;
+    });
+
+    // 按游戏顺序排序
+    dateEvents.sort((a, b) => {
+        const gameA = a.dataset.game;
+        const gameB = b.dataset.game;
+        return getGameOrder(gameA) - getGameOrder(gameB);
+    });
+
+    // 添加活动到列表
+    if (dateEvents.length === 0) {
+        eventsList.innerHTML = '<div style="color: #666; text-align: center;">当天没有活动</div>';
+    } else {
+        dateEvents.forEach(event => {
+            const eventItem = document.createElement('div');
+            eventItem.className = 'date-event-item';
+            eventItem.style.backgroundColor = getColor(event.dataset.game);
+
+            // 添加完成状态框
+            const completionBox = document.createElement('div');
+            completionBox.className = 'completion-box';
+            completionBox.dataset.status = event.querySelector('.completion-box').dataset.status;
+            completionBox.style.border = '2px dashed lightgrey';
+            completionBox.style.backgroundColor = 'rgba(225, 225, 225, 0.5)';
+
+            // 根据状态设置样式
+            switch (completionBox.dataset.status) {
+                case '1':
+                    completionBox.style.border = '2px solid lightgreen';
+                    completionBox.style.backgroundColor = '#6f67';
+                    completionBox.innerHTML = "✅";
+                    break;
+                case '2':
+                    completionBox.style.border = '2px solid yellow';
+                    completionBox.style.backgroundColor = 'rgba(255, 255, 0, 0.5)';
+                    completionBox.innerHTML = "⏩";
+                    break;
+            }
+
+            // 添加活动名称
+            const eventName = document.createElement('span');
+            eventName.textContent = event.querySelector('.event-title-content').textContent;
+
+            eventItem.appendChild(completionBox);
+            eventItem.appendChild(eventName);
+            eventsList.appendChild(eventItem);
+
+            // 点击事件项可以跳转到对应活动
+            eventItem.addEventListener('click', () => {
+                dateContainer.style.display = 'none';
+                event.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                event.click();
+            });
+        });
+    }
+
+    // 显示弹窗
+    dateContainer.style.display = 'block';
+
+    // 每秒更新倒计时
+    window.dateCountdownInterval = setInterval(updateCountdown, 1000);
+
+    // 当弹窗关闭时清除定时器
+    document.querySelector('.date-info-close-btn').addEventListener('click', () => {
+        clearInterval(dateCountdownInterval);
+    }, { once: true });
+}
+
+// 显示指南弹窗
+function showGuideModal() {
+    // 创建弹窗和遮罩
+    const overlay = document.createElement('div');
+    overlay.className = 'guide-overlay';
+
+    const modal = document.createElement('div');
+    modal.className = 'guide-modal';
+
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'guide-modal-close';
+    closeBtn.innerHTML = '&times;';
+    closeBtn.addEventListener('click', () => {
+        overlay.style.display = 'none';
+        modal.style.display = 'none';
+    });
+
+    const content = document.createElement('div');
+    content.className = 'guide-modal-content';
+    content.innerHTML = '<h2>加载中...</h2>';
+
+    modal.appendChild(closeBtn);
+    modal.appendChild(content);
+    document.body.appendChild(overlay);
+    document.body.appendChild(modal);
+
+    overlay.style.display = 'block';
+    modal.style.display = 'block';
+
+    // 使用fetch获取指南内容
+    fetch('static/guide.html') // 假设指南内容放在static/guide.html文件中
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('无法加载指南内容');
+            }
+            return response.text();
+        })
+        .then(html => {
+            content.innerHTML = html;
+        })
+        .catch(error => {
+            content.innerHTML = `
+                <h2>使用指南</h2>
+                <p>加载指南内容失败: ${error.message}</p>
+                <p>以下是基本使用说明:</p>
+                <h3>主要功能</h3>
+                <ul>
+                    <li>查看多款游戏的活动时间线</li>
+                    <li>点击活动查看详细信息</li>
+                    <li>标记活动完成状态</li>
+                    <li>一键启动游戏</li>
+                </ul>
+                <h3>操作指南</h3>
+                <ul>
+                    <li>点击活动条查看详情</li>
+                    <li>点击左侧颜色方块隐藏/显示游戏</li>
+                    <li>点击▶️按钮快速启动游戏</li>
+                </ul>
+            `;
+        });
+
+    // 点击遮罩关闭弹窗
+    overlay.addEventListener('click', () => {
+        overlay.style.display = 'none';
+        modal.style.display = 'none';
     });
 }
 

@@ -3,12 +3,14 @@ body {
     margin: 0;
     padding: 0;
     background-color: darkslateblue;
+    color: #333;
 }
 
 a {
     color: #00a3ff;
     text-decoration: none;
 }
+
 
 input:not([type=submit]):not([type=file]) {
     width: 110px;
@@ -26,15 +28,22 @@ input:not([type=submit]):not([type=file]):focus {
     box-shadow: inset 0 1px 1px rgba(0, 0, 0, .075), 0 0 8px rgba(102, 175, 233, .6);
 }
 
-input:not([type=submit]):not([type=file]).red {
+input:not([type=submit]):not([type=file]).red,
+.login-btn.red,
+.logout-btn.red {
     border-color: #fb5a5a;
     outline: 0;
     box-shadow: inset 0 1px 1px rgba(0, 0, 0, .075), 0 0 8px rgba(255, 110, 110, .6);
+    background-color: #ff5000;
 }
 
-.hide {
+
+.hide,
+.login-container.collapsed,
+.legend-inner.collapsed {
     display: none;
 }
+
 
 .timeline-container {
     width: 100%;
@@ -43,6 +52,7 @@ input:not([type=submit]):not([type=file]).red {
     white-space: nowrap;
     position: relative;
 }
+
 
 .date-axis {
     position: absolute;
@@ -56,9 +66,10 @@ input:not([type=submit]):not([type=file]).red {
 .date-label {
     color: #fff;
     flex: 1;
-    width: 18px;
+    width: 36px;
     position: absolute;
     line-height: 20px;
+    cursor: pointer;
 }
 
 .date-label-line {
@@ -69,11 +80,13 @@ input:not([type=submit]):not([type=file]).red {
     position: absolute;
 }
 
+
 .timeline {
     position: relative;
     height: 90%;
     margin-top: 75px;
 }
+
 
 .event {
     position: absolute;
@@ -84,27 +97,55 @@ input:not([type=submit]):not([type=file]).red {
     align-items: center;
     padding: 0 5px;
     cursor: pointer;
+    line-height: 30px;
 }
 
 .event-title {
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
     position: sticky;
     left: 5px;
-    display: inline-block;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    max-width: calc(100% - 150px);
+    height: 100%;
     z-index: 5;
-    vertical-align: middle;
-    max-width: 80%;
     user-select: none;
 }
 
-.event-banner {
-    mask-image: linear-gradient(to left, rgba(0, 0, 0, 1), rgba(0, 0, 0, 0));
-    border-radius: 6px;
-    zoom: 1.5;
-    background-size: 110%;
+.event-title-content {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
 }
+
+.time-remaining {
+    position: absolute;
+    right: -90px;
+    background-color: rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 2px 5px;
+    border-radius: 8px;
+    height: 20px;
+    line-height: 20px;
+    white-space: nowrap;
+}
+
+
+.completion-box {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    margin: 0 8px 0 4px;
+    font-size: 15px;
+    flex-shrink: 0;
+}
+
 
 .current-time-marker {
     position: absolute;
@@ -126,6 +167,7 @@ input:not([type=submit]):not([type=file]).red {
     z-index: 11;
 }
 
+
 .week-day {
     font-size: 12px;
     color: lightgrey;
@@ -140,23 +182,35 @@ input:not([type=submit]):not([type=file]).red {
 }
 
 .first-day {
-    width: 33px;
+    width: 34px;
     background-color: orange;
     position: sticky;
     left: 10px;
     z-index: 20;
 }
 
+.today {
+    font-weight: bold;
+}
+
+.today .today-date {
+    color: orange;
+}
+
+
 .left-corner-container {
     position: fixed;
     bottom: 30px;
     left: 20px;
     max-width: 45vw;
+    font-size: 14px;
     z-index: 99;
 }
 
+
 .legend-container,
-.login-container {
+.login-container,
+.banner-img-container {
     background-color: rgba(255, 255, 255, 0.8);
     padding: 10px;
     border-radius: 8px;
@@ -168,6 +222,7 @@ input:not([type=submit]):not([type=file]).red {
 .login-container {
     margin-bottom: 10px;
 }
+
 
 .legend-list {
     display: flex;
@@ -187,118 +242,35 @@ input:not([type=submit]):not([type=file]).red {
     margin-right: 8px;
 }
 
-.completion-box {
-    display: inline-block;
-    vertical-align: middle;
-    margin-top: -4px;
-    user-select: none;
-    width: 20px;
-    height: 20px;
-    border-radius: 4px;
-    margin-left: 4px;
-    margin-right: 8px;
-    font-size: 15px;
-}
 
-.label,
-.event-info {
-    font-size: 14px;
-    color: #333;
-}
-
-.today {
-    font-weight: bold;
-}
-
-.today .today-date {
-    color: orange;
-}
-
-.fixed-left {
-    position: fixed;
-    left: 0;
-}
-
-.banner-img-container {
-    position: fixed;
-    bottom: 30px;
-    right: 20px;
-    background-color: rgba(255, 255, 255, 0.8);
-    padding: 10px;
-    border-radius: 8px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-    z-index: 100;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    -webkit-backdrop-filter: blur(10px);
-    backdrop-filter: blur(10px);
-}
-
-.banner-img {
-    max-height: 200px;
-    max-width: 40vw;
-    object-fit: contain;
-    border-radius: 8px;
-}
-
-.close-btn {
-    position: absolute;
-    top: -18px;
-    right: -18px;
-    background-color: rgba(255, 255, 255, 0.8);
+.toggle-btn,
+.login-btn,
+.login-button,
+.logout-btn,
+.retry-btn,
+.game-action-panel button {
+    background-color: #00a3ff;
+    color: white;
     border: none;
-    color: #333;
-    font-size: 20px;
+    border-radius: 4px;
     cursor: pointer;
-    border-radius: 50%;
-    width: 30px;
-    height: 30px;
-    line-height: 30px;
-    text-align: center;
-    padding: 0;
-    transition: all .3s;
-    backdrop-filter: blur(10px);
+    transition: background-color 0.3s;
+    padding: 6px;
 }
 
-.close-btn:hover {
-    background-color: rgba(255, 0, 0, 0.8);
-    color: white;
-}
-
-.time-remaining {
-    position: absolute;
-    right: -40px;
-    background-color: #fff5;
-    color: white;
-    padding: 2px 5px;
-    border-radius: 8px;
-    white-space: nowrap;
+.toggle-btn:hover,
+.login-btn:hover,
+.login-button:hover,
+.logout-btn:hover,
+.retry-btn:hover {
+    background-color: #007acc;
 }
 
 .toggle-btn {
     position: absolute;
     bottom: 10px;
     right: 10px;
-    background-color: #00a3ff;
-    color: white;
-    border: none;
-    border-radius: 4px;
     padding: 5px 10px;
-    cursor: pointer;
-    transition: background-color 0.3s;
-}
-
-.toggle-btn:hover {
-    background-color: #007acc;
-}
-
-.login-container.collapsed {
-    display: none;
-}
-
-.legend-inner.collapsed {
-    display: none;
 }
 
 .legend-container.collapsed .toggle-btn {
@@ -309,23 +281,6 @@ input:not([type=submit]):not([type=file]).red {
     background-color: #cc4000;
 }
 
-.login-btn,
-.login-button,
-.logout-btn {
-    background-color: #00a3ff;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: background-color 0.3s;
-    padding: 6px;
-}
-
-.login-btn:hover,
-.login-button:hover,
-.logout-btn:hover {
-    background-color: #40a9ff;
-}
 
 .login-btn:disabled,
 .login-button:disabled,
@@ -334,74 +289,17 @@ input:not([type=submit]):not([type=file]).red {
     cursor: not-allowed;
 }
 
-.login-btn.red,
-.logout-btn.red {
-    background-color: #ff5000;
-}
-
-.sort-container {
-    margin-top: 10px;
-    text-align: center;
-}
-
-.sort-select {
-    padding: 5px;
-    border-radius: 5px;
-    border: 1px solid #ccc;
-    background-color: #fff;
-    cursor: pointer;
-}
-
-.error-message {
-    color: #ff4d4f;
-    padding: 10px;
-    text-align: center;
-}
-
-.error-message p {
-    margin: 5px 0;
-}
-
-.retry-btn {
-    background-color: #00a3ff;
-    color: white;
-    border: none;
-    padding: 5px 10px;
-    border-radius: 4px;
-    cursor: pointer;
-    margin-top: 10px;
-    transition: background-color 0.3s;
-}
-
-.retry-btn:hover {
-    background-color: #40a9ff;
-}
-
-.game-action-btn {
-    margin-left: 4px;
-    cursor: pointer;
-    font-size: 12px;
-    opacity: 0.7;
-    transition: opacity 0.2s;
-}
-
-.game-action-btn:hover {
-    opacity: 1;
-}
 
 .game-action-panel {
     position: absolute;
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(10px);
+    border-radius: 8px;
     top: 8px;
     left: 10px;
-    background: rgba(255, 255, 255, 0.8);
-    border-radius: 8px;
-    padding: 15px;
-    width: 120px;
+    width: 122px;
     z-index: 1000;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    color: black;
-    -webkit-backdrop-filter: blur(10px);
-    backdrop-filter: blur(10px);
+    padding: 15px;
 }
 
 .game-action-panel h3 {
@@ -425,15 +323,13 @@ input:not([type=submit]):not([type=file]).red {
     width: 100%;
     padding: 8px;
     margin: 5px 0;
-    border: none;
-    border-radius: 4px;
-    background: #4CAF50;
-    color: white;
-    cursor: pointer;
-    transition: background 0.2s;
 }
 
-.game-action-panel button:hover {
+.game-action-panel button.launch-btn {
+    background: #4CAF50;
+}
+
+.game-action-panel button.launch-btn:hover {
     background: #45a049;
 }
 
@@ -462,4 +358,285 @@ input:not([type=submit]):not([type=file]).red {
 
 .game-action-panel .back-btn:hover {
     background: #aaa;
+}
+
+
+.time-remaining {
+    position: absolute;
+    right: -40px;
+    background-color: #fff5;
+    color: white;
+    padding: 2px 5px;
+    border-radius: 8px;
+    white-space: nowrap;
+    height: 20px;
+    line-height: 20px;
+}
+
+.sort-container {
+    margin-top: 10px;
+    text-align: center;
+}
+
+.sort-select {
+    padding: 5px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+    background-color: #fff;
+    cursor: pointer;
+}
+
+.error-message {
+    color: #ff4d4f;
+    padding: 10px;
+    text-align: center;
+}
+
+.error-message p {
+    margin: 5px 0;
+}
+
+.game-action-btn {
+    margin-left: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.game-action-btn:hover {
+    opacity: 1;
+}
+
+.fixed-left {
+    position: fixed;
+    left: 0;
+}
+
+.banner-img-container {
+    position: fixed;
+    bottom: 30px;
+    right: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+}
+
+.banner-img {
+    max-height: 200px;
+    max-width: 40vw;
+    object-fit: contain;
+    border-radius: 8px;
+}
+
+.close-btn {
+    position: absolute;
+    top: -30px;
+    right: 0px;
+    background-color: rgba(255, 255, 255, 0.8);
+    border: none;
+    color: #333;
+    font-size: 20px;
+    cursor: pointer;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    line-height: 30px;
+    text-align: center;
+    padding: 0;
+    transition: all .3s;
+    backdrop-filter: blur(10px);
+}
+
+.close-btn:hover {
+    background-color: rgba(255, 0, 0, 0.8);
+    color: white;
+}
+
+.event-banner {
+    mask-image: linear-gradient(to left, rgba(0, 0, 0, 1), rgba(0, 0, 0, 0));
+    border-radius: 6px;
+    zoom: 1.5;
+    background-size: 110%;
+}
+
+.date-info-container {
+    position: fixed;
+    top: 50px;
+    right: 20px;
+    width: 400px;
+    height: auto;
+    max-height: 45vh;
+    background-color: rgba(255, 255, 255, 0.8);
+    max-width: 65vw;
+    border-radius: 8px;
+    padding: 0;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    z-index: 1000;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    backdrop-filter: blur(10px);
+}
+
+.date-info-header {
+    height: 25px;
+    padding: 15px;
+    background-color: rgba(255, 255, 255, 0.8);
+    border-bottom: 1px solid #eee;
+    flex-shrink: 0;
+}
+
+.date-info-title {
+    font-size: 18px;
+    font-weight: bold;
+    /* display: block; */
+    margin-bottom: 5px;
+}
+
+.date-info-countdown {
+    font-size: 14px;
+    color: #666;
+}
+
+.date-info-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 15px;
+    max-height: calc(45vh - 90px);
+}
+
+.date-events-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px 0;
+}
+
+.date-event-item {
+    padding: 8px 12px;
+    border-radius: 6px;
+    color: white;
+    word-break: break-word;
+    white-space: normal;
+    display: flex;
+    align-items: center;
+}
+
+.date-event-item .completion-box {
+    margin-right: 8px;
+    flex-shrink: 0;
+}
+
+.date-info-close-btn {
+    position: absolute;
+    top: 13px;
+    right: 10px;
+    background-color: #ddd;
+    border: none;
+    color: #333;
+    font-size: 20px;
+    cursor: pointer;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    line-height: 30px;
+    text-align: center;
+    padding: 0;
+    transition: all .3s;
+    backdrop-filter: blur(10px);
+}
+
+.date-info-close-btn:hover {
+    background-color: rgba(255, 0, 0, 0.8);
+    color: white;
+}
+
+.guide-modal {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 80%;
+    max-width: 800px;
+    max-height: 80vh;
+    background-color: #2a2a2a;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    overflow-y: auto;
+    color: #fff;
+}
+
+.guide-modal h2 {
+    color: #fff;
+    margin-top: 0;
+    border-bottom: 1px solid #444;
+    padding-bottom: 10px;
+}
+
+.guide-modal h3 {
+    color: #ddd;
+    margin-top: 20px;
+}
+
+.guide-modal p, .guide-modal ul {
+    line-height: 1.6;
+}
+
+.guide-modal-close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 20px;
+    cursor: pointer;
+}
+
+.guide-modal-content {
+    padding-right: 15px;
+}
+
+.guide-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    z-index: 999;
+}
+
+::selection {
+    background-color: #00a3ff;
+    color: #fff;
+}
+
+::-moz-selection {
+    background-color: #00a3ff;
+    color: #fff;
+}
+
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #8888;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #fffb;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #fffe;
 }

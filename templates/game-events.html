@@ -6,7 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>游梦纪事 - 活动时间线</title>
     <meta name="referrer" content="never">
-    <!-- <meta name="referrer" content="no-referrer"> -->
     <link rel="icon" type="image/png" href="/favicon">
     <link rel="shortcut icon" href="/favicon">
     <link rel="stylesheet" href="static/style.css">
@@ -31,7 +30,7 @@
             <div class="legend-inner">
                 <div class="legend-list label">Loading...</div>
                 <hr>
-                <select id="sort-select" class="sort-select">
+                <select id="sort-select" class="sort-select" disabled>
                     <option value="default">按游戏默认顺序</option>
                     <option value="end-time">按活动结束时间升序</option>
                 </select>
@@ -40,7 +39,8 @@
                     <a href="https://github.com/shoyu3/game-events-timeline" target="_blank"
                         style="vertical-align: middle;">GitHub</a>
                     <img src="https://img.shields.io/github/stars/shoyu3/game-events-timeline?style=social&label=Star"
-                        style="vertical-align: middle;" width="70" height="20">
+                        style="vertical-align: middle;" width="70" height="20"><br>
+                    <a href="javascript:;" class="guide-link" style="vertical-align: middle;">使用指南</a>
                     <br>© 2025 <a href="https://shoyu.top">Shoyu</a>
                 </div>
             </div>
@@ -56,6 +56,16 @@
             <span class="event-remaining-time"></span>
         </div>
         <button class="close-btn">✕</button>
+    </div>
+    <div class="date-info-container" style="display:none;">
+        <div class="date-info-header">
+            <span class="date-info-title"></span>
+            <span class="date-info-countdown"></span>
+        </div>
+        <div class="date-info-content">
+            <div class="date-events-list"></div>
+        </div>
+        <button class="date-info-close-btn">✕</button>
     </div>
     <script src="https://static.geetest.com/v4/gt4.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jsencrypt/3.3.2/jsencrypt.min.js"></script>
