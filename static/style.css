@@ -11,6 +11,10 @@ a {
     text-decoration: none;
 }
 
+hr {
+    border: 1px dashed #0006;
+}
+
 
 input:not([type=submit]):not([type=file]) {
     width: 110px;
@@ -298,7 +302,7 @@ input:not([type=submit]):not([type=file]).red,
     top: 8px;
     left: 10px;
     width: 122px;
-    z-index: 1000;
+    z-index: 101;
     padding: 15px;
 }
 
@@ -473,7 +477,7 @@ input:not([type=submit]):not([type=file]).red,
     border-radius: 8px;
     padding: 0;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-    z-index: 1000;
+    z-index: 101;
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -562,13 +566,14 @@ input:not([type=submit]):not([type=file]).red,
     width: 80%;
     max-width: 800px;
     max-height: 80vh;
-    background-color: #2a2a2a;
+    background-color: #2a2a2aaa;
     border-radius: 8px;
     padding: 20px;
     box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
-    z-index: 1000;
+    z-index: 1001;
     overflow-y: auto;
     color: #fff;
+    backdrop-filter: blur(16px);
 }
 
 .guide-modal h2 {
@@ -583,7 +588,8 @@ input:not([type=submit]):not([type=file]).red,
     margin-top: 20px;
 }
 
-.guide-modal p, .guide-modal ul {
+.guide-modal p,
+.guide-modal ul {
     line-height: 1.6;
 }
 
@@ -614,12 +620,12 @@ input:not([type=submit]):not([type=file]).red,
 }
 
 ::selection {
-    background-color: #00a3ff;
+    background-color: #0094e8;
     color: #fff;
 }
 
 ::-moz-selection {
-    background-color: #00a3ff;
+    background-color: #0094e8;
     color: #fff;
 }
 

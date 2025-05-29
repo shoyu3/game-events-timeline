@@ -661,13 +661,13 @@ function createTimeline(events) {
         setInterval(updateEventCountdown, 1000);
         eventElement.addEventListener('click', function () {
             document.querySelectorAll('.event').forEach(e => {
-                if (e.style.borderTopWidth === "3px") {
-                    e.style.border = 'none';
-                    e.style.top = parseInt(e.style.top) + 3 + "px";
+                if (e.style.outlineWidth === "3px") {
+                    e.style.outline = 'none';
+                    // e.style.top = parseInt(e.style.top) + 3 + "px";
                 }
             });
-            eventElement.style.border = '3px solid white';
-            eventElement.style.top = parseInt(eventElement.style.top) - 3 + "px";
+            eventElement.style.outline = '3px solid white';
+            // eventElement.style.top = parseInt(eventElement.style.top) - 3 + "px";
             if (event.bannerImage) {
                 showBannerWithInfo(event);
             }
@@ -1157,10 +1157,23 @@ function showGuideModal() {
     const closeBtn = document.createElement('button');
     closeBtn.className = 'guide-modal-close';
     closeBtn.innerHTML = '&times;';
-    closeBtn.addEventListener('click', () => {
+
+    // 定义关闭函数
+    const closeModal = () => {
         overlay.style.display = 'none';
         modal.style.display = 'none';
-    });
+        // 延迟移除元素以确保动画完成
+        setTimeout(() => {
+            if (document.body.contains(overlay)) {
+                document.body.removeChild(overlay);
+            }
+            if (document.body.contains(modal)) {
+                document.body.removeChild(modal);
+            }
+        }, 300); // 假设有300ms的动画时间
+    };
+
+    closeBtn.addEventListener('click', closeModal);
 
     const content = document.createElement('div');
     content.className = 'guide-modal-content';
@@ -1175,7 +1188,7 @@ function showGuideModal() {
     modal.style.display = 'block';
 
     // 使用fetch获取指南内容
-    fetch('static/guide.html') // 假设指南内容放在static/guide.html文件中
+    fetch('static/guide.html')
         .then(response => {
             if (!response.ok) {
                 throw new Error('无法加载指南内容');
@@ -1207,9 +1220,10 @@ function showGuideModal() {
         });
 
     // 点击遮罩关闭弹窗
-    overlay.addEventListener('click', () => {
-        overlay.style.display = 'none';
-        modal.style.display = 'none';
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+            closeModal();
+        }
     });
 }
 
